@@ -1,0 +1,21 @@
+{
+  "name": "more.gl",
+  "description": "A library of common classes used with opengl",
+  "authors": ["Jonathan Marler"],
+  "homepage": "http://marler.info/more.gl",
+  "copyright": "Copyright (c) 2014 Jonathan Marler",
+  "targetType": "staticLibrary",
+  "sourceFiles": [
+    "gl.d",
+    "glfw.d"
+  ],
+  "dependencies" : {
+    "glad-drey" : ">=0.0.1",
+    "glfw-drey" : ">=0.0.2",
+    "gl3n" : "~master",
+    "more" : {
+      "version" : "~master",
+      "path"    : ".."
+    }
+  }
+}

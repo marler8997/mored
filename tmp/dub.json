@@ -1,0 +1,15 @@
+{
+  "name": "tmpServer",
+  "description": "A TMP protocol server",
+  "copyright": "Copyright © 2013, Jonathan Marler",
+  "authors": ["Jonathan Marler"],
+  "targetType": "executable",
+  "sourceFiles": ["tmpServer.d"],
+  "mainSourceFile": "tmpServer.d",
+  "dependencies": {
+    "more" : {
+      "version" : "~master",
+      "path"    : ".."
+    }
+  }
+}

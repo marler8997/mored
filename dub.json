@@ -1,0 +1,13 @@
+{
+  "name": "more",
+  "description": "A library D code",
+  "authors": ["Jonathan Marler"],
+  "homepage": "http://github.com/marler8997/mored",
+  "copyright": "Copyright (c) 2014 Jonathan Marler",
+  "targetType": "staticLibrary",
+  "sourceFiles": [
+    "common.d",
+    "sos.d",
+    "net.d"
+  ]
+}
