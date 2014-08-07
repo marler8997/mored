@@ -5,6 +5,7 @@
   "homepage": "http://github.com/marler8997/mored",
   "license": "public domain",
   "targetType": "staticLibrary",
+  "importPaths" : ["."],
   "sourceFiles": [
     "more/common.d",
     "more/sos.d",
