@@ -6,8 +6,8 @@
   "license": "public domain",
   "targetType": "staticLibrary",
   "sourceFiles": [
-    "common.d",
-    "sos.d",
-    "net.d"
+    "more/common.d",
+    "more/sos.d",
+    "more/net.d"
   ]
 }

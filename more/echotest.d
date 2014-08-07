@@ -1,7 +1,7 @@
 import std.stdio;
 import std.socket;
 
-import net;
+import more.net;
 
 void main()
 {
