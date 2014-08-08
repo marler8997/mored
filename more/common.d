@@ -10,6 +10,14 @@ import core.exception;
 
 import std.c.string : memmove;
 
+void implement() {
+  throw new Exception("not implemented");
+}
+void implement(string feature) {
+  throw new Exception(feature~" not implemented");
+}
+
+
 template isChar(T) {
   static if(is(T == char) ||
 	    is(T == const char) ||
@@ -477,9 +485,8 @@ unittest
   line = "\"Missing ending quote\nOn next line \"";
   assert(tryParseFields(fields, line) == noEndingQuoteMessage);
 
-
+  line = "";
   assert(tryParseFields(fields, line) == null);
-
 }
 
 
@@ -736,3 +743,73 @@ inout(char)[] escape(inout(char)[] str) pure {
 
   return cast(inout(char)[])newString;
 }
+
+alias size_t delegate(char[] buffer) CharReader;
+alias size_t delegate(ubyte[] buffer) DataReader;
+
+
+struct AsciiBufferedInput
+{
+  CharReader reader;
+  char[] buffer;
+  size_t start;
+  size_t limit;
+
+  this(inout(char)[] s) {
+    this.reader = &emptyRead;
+    this.buffer = new char[s.length + 1];
+    this.buffer[0..$-1] = s;
+    this.start = 0;
+    this.limit = s.length;
+  }
+  private size_t emptyRead(char[] buffer) { return 0; }
+
+  char[] sliceSaved() {
+    return buffer[start..limit];
+  }
+
+  void clear() {
+    start = 0;
+    limit = 0;
+  }
+
+  // returns true if there is data, false on EOF
+  bool readNoSave() {
+    start = 0;
+    limit = reader(buffer);
+    return limit > 0;
+  }
+
+  // returns true if read succeeded, false on EOF
+  bool read(size_t* offsetToShift) {
+    //writefln("[DEBUG] --> read(start=%s, limit=%s)", start, limit);
+    size_t leftover = limit - start;
+
+    if(leftover) {
+      if(leftover >= buffer.length) {
+	throw new Exception("Buffer not large enough");
+      }
+      
+      if(start > 0) {
+	memmove(buffer.ptr, buffer.ptr + start, leftover);
+	*offsetToShift -= leftover;
+      }
+    }
+
+    start = 0;
+    limit = leftover;
+    size_t readLength = reader(buffer[leftover..$]);
+    if(readLength == 0) {
+      //writefln("[DEBUG] <-- read(start=%s, length=%s) = false", start, length);
+      return false;
+    }
+
+    limit += readLength;
+    return true;
+  }
+
+
+}
+
+
+
