@@ -16,7 +16,7 @@ enum invalidEndMessage = "input ended with invalid UTF-8 character";
 // This method assumes that utf8 points to at least one character
 // and that the first non-valid pointer is at the limit pointer
 // (this means that utf8 < limit)
-dchar decodeUtf8(ref inout(char)* utf8, inout(char)* limit) {
+dchar decodeUtf8(ref inout(char)* utf8, const char* limit) {
   dchar c = *utf8;
   utf8++;
   if((c & 0x80) == 0) {
@@ -37,7 +37,7 @@ dchar decodeUtf8(ref inout(char)* utf8, inout(char)* limit) {
 // Copyright (c) 2008-2009 Bjoern Hoehrmann <bjoern@hoehrmann.de>
 // See http://bjoern.hoehrmann.de/utf-8/decoder/dfa/ for details.
 //
-dchar bjoernDecodeUtf8(ref inout(char)* utf8, inout(char)* limit) {
+dchar bjoernDecodeUtf8(ref inout(char)* utf8, const char* limit) {
   static __gshared ubyte utf8lookup[] = [
     0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 00..1f
     0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 20..3f

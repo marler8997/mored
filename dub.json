@@ -9,6 +9,8 @@
   "sourceFiles": [
     "more/common.d",
     "more/sos.d",
-    "more/net.d"
+    "more/net.d",
+    "more/sdl.d",
+    "more/utf8.d"
   ]
 }

@@ -56,13 +56,26 @@ public interface IDisposable
 {
   void dispose();
 }
+
+
+
 void startTest(string name)
 {
   writeSection(name ~ ": Start");
 }
-void endTest(string name)
+void endFailedTest(string name)
+{
+  writeSection(name ~ ": Failed");
+}
+void endPassedTest(string name)
 {
   writeSection(name ~ ": Passed");
+}
+template scopedTest(string name) {
+  enum scopedTest = 
+    "startTest(\""~name~"\");"~
+    "scope(failure) endFailedTest(\""~name~"\");"~
+    "scope(success) endPassedTest(\""~name~"\");";
 }
 void writeSection(string name)
 {
@@ -691,7 +704,6 @@ immutable string[] escapeTable =
 string escape(char c) {
   return escapeTable[c];
 }
-
 unittest
 {
   import std.stdio;
@@ -744,9 +756,45 @@ inout(char)[] escape(inout(char)[] str) pure {
   return cast(inout(char)[])newString;
 }
 
+//alias void delegate(const char[] str) CharWriter;
+struct StdoutWriter
+{
+  void put(const (char)[] str) {
+    write(str);
+  }
+}
+
+struct ReadBuffer(T)
+{
+  const(T)* next;
+  const T* limit;
+}
+struct WriteBuffer(T)
+{
+  T* next;
+  const T* limit;
+  this(T[] array) {
+    this.next = array.ptr;
+    this.limit = array.ptr + array.length;
+  }
+  T[] slice(T* start) {
+    return start[0..next-start];
+  }
+  void put(const(T)[] array) {
+    if(next + array.length > limit)
+      throw new Exception(format("buffer has %s elements left but you tried to add %s",
+				 limit - next, array.length));
+
+    foreach(value; array) {
+      *next = value;
+      next++;
+    }
+  }
+}
+
+
 alias size_t delegate(char[] buffer) CharReader;
 alias size_t delegate(ubyte[] buffer) DataReader;
-
 
 struct AsciiBufferedInput
 {
