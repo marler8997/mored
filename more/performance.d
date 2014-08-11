@@ -25,7 +25,7 @@ float stdTimeMillis(long stdTime)
 void TestRun(tests...)(string name, uint runs, uint iterations)
 {
   float[tests.length] times = 0;
-  
+
   notifyStart(name);
   foreach(run; 0..runs) {
 
@@ -122,7 +122,7 @@ void main(string[] args)
       long time = Clock.currStdTime();
     }
     end("Clock.currStdTime()");
-    
+
     start();
     for(i = 0; i < ClockIterations; i++) {
       TickDuration duration = Clock.currSystemTick();
@@ -142,7 +142,7 @@ void main(string[] args)
     end("Clock.currTime()");
   }
 +/
-  
+
 
   TestRun!(
 	   "StructInitializer"   , "ABCStruct s = {a:1,b:2,c:3};",

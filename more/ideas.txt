@@ -1,0 +1,17 @@
+
+
+A string iterator
+
+Example:
+  auto s = "t{able|ree|uck}"
+  foreach(result; generator(s)) {
+    // will have "table", then "tree", then "truck"
+  }
+
+Note: if '|' and '{' '}' are at the same depth, the curly braces
+      are expanded first, and then the '| is evaluated so the following:
+      "1|2{3|4}"
+        "1"
+        "23"
+        "24"
+

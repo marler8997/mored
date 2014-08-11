@@ -72,7 +72,7 @@ void endPassedTest(string name)
   writeSection(name ~ ": Passed");
 }
 template scopedTest(string name) {
-  enum scopedTest = 
+  enum scopedTest =
     "startTest(\""~name~"\");"~
     "scope(failure) endFailedTest(\""~name~"\");"~
     "scope(success) endPassedTest(\""~name~"\");";
@@ -837,7 +837,7 @@ struct AsciiBufferedInput
       if(leftover >= buffer.length) {
 	throw new Exception("Buffer not large enough");
       }
-      
+
       if(start > 0) {
 	memmove(buffer.ptr, buffer.ptr + start, leftover);
 	*offsetToShift -= leftover;
@@ -861,3 +861,57 @@ struct AsciiBufferedInput
 
 
 
+//
+// Permutation Stuff
+
+
+
+
+
+  // return false if no more permutations
+  bool nextPermutation(ref size_t[] permutation, size_t max) {
+    size_t off = permutation.length - 1;
+    while(true) {
+      if(permutation[off] < max) {
+	permutation[off]++;
+	return true;
+      }
+      permutation[off] = 0;
+      if(off == 0) return false;
+      off--;
+    }
+  }
+
+  struct Permuter {
+    string[] elements;
+    size_t[] fullPermutationIndexBuffer;
+
+    private size_t[] currentPermutationBuffer;
+    bool isEmpty;
+
+    this(string[] elements, size_t[] fullPermutationIndexBuffer) {
+      this.elements = elements;
+      this.fullPermutationIndexBuffer = fullPermutationIndexBuffer;
+
+      this.currentPermutationBuffer = fullPermutationIndexBuffer[0..1];
+      this.currentPermutationBuffer[] = 0;
+    }
+
+    bool empty() { return isEmpty; }
+    void putInto(ref WriteBuffer!char buffer) {
+      foreach(idx; currentPermutationBuffer) {
+	buffer.put(elements[idx]);
+      }
+    }
+    void popFront() {
+      bool isNowEmpty = !nextPermutation(this.currentPermutationBuffer, elements.length - 1);
+      if(isNowEmpty) {
+	if(currentPermutationBuffer.length >= fullPermutationIndexBuffer.length) {
+	  this.isEmpty = true;
+	} else {
+	  currentPermutationBuffer.length++;
+	  currentPermutationBuffer[] = 0;
+	}
+      }
+    }
+  }
