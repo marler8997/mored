@@ -3,6 +3,16 @@ import std.datetime;
 
 import more.utf8;
 
+
+version(sdl) {
+  // SDL TESTS
+  import sdlang_.ast;
+  import sdlang_.parser;
+  import more.sdl;
+}
+
+
+
 bool printIndividualTestRuns = true;
 
 void notifyStart(string name)
@@ -10,6 +20,7 @@ void notifyStart(string name)
   writefln("--------------------------------------");
   writefln("Performance Test: '%s'", name);
   writefln("--------------------------------------");
+  stdout.flush();
 }
 
 void logTime(uint run, string id, float time)
@@ -27,6 +38,7 @@ void TestRun(tests...)(string name, uint runs, uint iterations)
   float[tests.length] times = 0;
 
   notifyStart(name);
+
   foreach(run; 0..runs) {
 
     foreach(testIndex, test; tests) {
@@ -51,6 +63,7 @@ void TestRun(tests...)(string name, uint runs, uint iterations)
       writefln("%-24s : %f millis", test, times[testIndex/2]);
     }
   }
+  stdout.flush();
 }
 
 
@@ -71,7 +84,27 @@ struct ABCStructConstructor {
 }
 
 
+version(sdl) {
 
+  string testSdlString = `
+first-tag "value" "another-value" myattribute=null {
+    child-tag name="freddy" {
+        grand-child-tag name="jimmy" {
+        }
+    }
+}
+second-tag "cool" iscool=true {
+
+}
+a-list "apple" null true false on off
+a-matrix {
+ 1 2 3 4 5
+ 3 4 5 6 7
+}
+
+`;
+
+}
 
 void ModifyByReference(ref ABCStruct s) {
   s.a = 1;
@@ -113,37 +146,6 @@ void main(string[] args)
 	   "Clock.currTime()"      , "SysTime time = Clock.currTime();"
 	   )("FastestClockFunction", runCount, 1000000);
 
-/+
-  notifyStart("Fastest Clock Function");
-
-  for(run = 0; run < runCount; run++) {
-    start();
-    for(i = 0; i < ClockIterations; i++) {
-      long time = Clock.currStdTime();
-    }
-    end("Clock.currStdTime()");
-
-    start();
-    for(i = 0; i < ClockIterations; i++) {
-      TickDuration duration = Clock.currSystemTick();
-    }
-    end("Clock.currSystemTick()");
-
-    start();
-    for(i = 0; i < ClockIterations; i++) {
-      TickDuration duration = Clock.currAppTick();
-    }
-    end("Clock.curAppTick()");
-
-    start();
-    for(i = 0; i < ClockIterations; i++) {
-      SysTime time = Clock.currTime();
-    }
-    end("Clock.currTime()");
-  }
-+/
-
-
   TestRun!(
 	   "StructInitializer"   , "ABCStruct s = {a:1,b:2,c:3};",
 	   "StructConstructor"   , "ABCStructConstructor s = ABCStructConstructor(1,2,3);"
@@ -163,7 +165,15 @@ void main(string[] args)
   TestRun!(
 	   "MarlerUtf8Decode"       , "string str = testStringA; auto start = str.ptr; decodeUtf8(start, str.ptr + str.length);",
 	   "BjoernUtf8Decode"       , "string str = testStringA; auto start = str.ptr; bjoernDecodeUtf8(start, str.ptr + str.length);"
-	   )("Marler vs Bjoern Utf8 Decode", runCount, 100000000);
+	   )("Marler vs Bjoern Utf8 Decode", runCount, 1000000);
 
 
+  version(sdl) {
+
+    TestRun!(
+	     "sdlang_"         , "sdlang_.ast.Tag tag; tag = sdlang_.parser.parseSource(testSdlString);",
+	     "more.sdl"        , "more.sdl.Tag tag; char[] sdl = cast(char[])testSdlString; while(more.sdl.parseSdlTag(&tag, &sdl)) { }"
+	     )("sdlang_ vs more.sdl", runCount, 10000);
+
+  }
 }
