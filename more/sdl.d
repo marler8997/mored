@@ -103,12 +103,11 @@
    TODO: implement numbers
    TODO: write a generic input sdl parser that uses parseSdlTag
    TODO: support some sort of reflection
-   TODO: possibly add lookup table to check for things like isID/isIDStart
+   TODO: support non-quoted strings
 
    Authors: Jonathan Marler, johnnymarler@gmail.com
    License: use freely for any purpose
  */
-
 
 module more.sdl;
 
@@ -117,6 +116,7 @@ import std.string;
 import std.range;
 import std.conv;
 import std.bitmanip;
+import std.traits;
 
 import std.c.string: memmove;
 
@@ -158,33 +158,73 @@ struct Attribute {
 /// It does not contain any information about its children because that part of the sdl would not have been parsed yet.
 /// It is used directly for the StAX/SAX APIs but not for the DOM API.
 struct Tag {
-  // These bitfields set flags to support non-standard
-  // sdl.  The default value 0 will disable all flags
-  // so the parser only allows standard sdl;
-  mixin(bitfields!(
-		   // Normally SDL only allows a tag to have attributes after all its
-		   // values.  This option allows them to be mixed i.e.
-		   //     tag attr="my-value" "another-value" would be valid
-		   bool,  "allowMixedValuesAndAttributes", 1,
-		   // Allows tag braces to appear after any number of newlines
-		   bool,  "allowBraceAfterNewline", 1,
-		   // Prevents sdl from modifying the given text for things such as
-		   // processing escaped strings
-		   bool,  "preserveSdlText", 1,
-		   // TODO: maybe add an option to specify that any values accessed should be copied to new buffers
-		   // NOTE: Do not add an option to prevent parseSdlTag from throwing exceptions when the input has ended.
-		   //       It may have been useful for an input buffered object, however, the buffered input object will
-		   //       need to know when it has a full tag anyway so the sdl will already contain the characters to end the tag.
-		   //       Or in the case of braces on the next line, if the tag has alot of whitespace until the actual end-of-tag
-		   //       delimiter, the buffered input reader can insert a semi-colon or open_brace to signify the end of the tag
-		   //       earlier.
-		   ubyte, "", 5));
 
-  void resetOptions() {
+  // A bifield of flags used to pass extra options to parseSdlTag.
+  // Used to accept/reject different types of SDL or cause parseSdlTag to
+  // behave differently like preventing it from modifying the sdl text.
+  private ubyte flags;
+  
+  /// Normally SDL only allows attributes to appear after all it's values.
+  /// This flag causes parseSdlTag to allow values/attributes to appear in any order, i.e.
+  ///     tag attr="my-value" "another-value" # would be valid
+  @property @safe bool allowMixedValuesAndAttributes() pure nothrow const { return (flags & 1U) != 0;}
+  @property @safe void allowMixedValuesAndAttributes(bool v) pure nothrow { if (v) flags |= 1U;else flags &= ~1U;}
+
+  /// Causes parseSdlTag to allow a tag's open brace to appear after any number of newlines
+  @property @safe bool allowBraceAfterNewline() pure nothrow const        { return (flags & 2U) != 0;}
+  @property @safe void allowBraceAfterNewline(bool v) pure nothrow        { if (v) flags |= 2U;else flags &= ~2U;}
+
+  /// Causes parseSdlTag to throw an exception if it finds any number literals
+  /// with postfix letters indicating the type
+  @property @safe bool rejectTypedNumbers() pure nothrow const            { return (flags & 4U) != 0;}
+  @property @safe void rejectTypedNumbers(bool v) pure nothrow            { if (v) flags |= 4U;else flags &= ~4U;}
+
+  /// Prevents parseSdlTag from modifying the given sdl text for things such as
+  /// processing escaped strings
+  @property @safe bool preserveSdlText() pure nothrow const               { return (flags & 8U) != 0;}
+  @property @safe void preserveSdlText(bool v) pure nothrow               { if (v) flags |= 8U;else flags &= ~8U;}
+
+
+  /// TODO: maybe add an option to specify that any values accessed should be copied to new buffers
+  /// NOTE: Do not add an option to prevent parseSdlTag from throwing exceptions when the input has ended.
+  ///       It may have been useful for an input buffered object, however, the buffered input object will
+  ///       need to know when it has a full tag anyway so the sdl will already contain the characters to end the tag.
+  ///       Or in the case of braces on the next line, if the tag has alot of whitespace until the actual end-of-tag
+  ///       delimiter, the buffered input reader can insert a semi-colon or open_brace to signify the end of the tag
+  ///       earlier.
+  
+
+
+  /// For now an alias for useStrictSdl. Use this function if you want your code to always use
+  /// the default mode whatever it may become.
+  alias useStrictSdl useDefaultSdl;
+
+  /// This is the default mode.
+  /// 1. Causes sdlParseTag to throw SdlParseException if a tag's open brace appears after a newline
+  /// 2. Causes sdlParseTag to throw SdlParseException if any tag value appears after any tag attribute
+  /// 3. Causes sdlParseTag to accept postfix characters after number literals.
+  void useStrictSdl() {
     this.allowMixedValuesAndAttributes = false;
     this.allowBraceAfterNewline = false;
-    this.preserveSdlText = false;
+    this.rejectTypedNumbers = false;
   }
+  /// 1. Causes sdlParseTag to throw SdlParseException if a tag's open brace appears after a newline
+  /// 2. Causes sdlParseTag to throw SdlParseException if any tag value appears after any tag attribute
+  /// 3. Causes sdlParseTag to accept postfix characters after number literals.
+  void useLooseSdl() {
+    this.allowMixedValuesAndAttributes = true;
+    this.allowBraceAfterNewline = true;
+    this.rejectTypedNumbers = false;
+  }
+  /// 1. Causes sdlParseTag to throw SdlParseException if a tag's open brace appears after a newline
+  /// 2. Causes sdlParseTag to throw SdlParseException if any tag value appears after any tag attribute
+  /// 3. Causes sdlParseTag to throw SdlParseException if a number literal has any postfix characters
+  void useProposedSdl() {
+    this.allowMixedValuesAndAttributes = true;
+    this.allowBraceAfterNewline = true;
+    this.rejectTypedNumbers = true;
+  }
+
 
   /// The depth of the tag, all root tags start at depth 0.
   size_t depth = 0;
@@ -258,7 +298,7 @@ struct Tag {
   /// Gets the tag ready to parse a new sdl tree by resetting the depth and the line number.
   /// It is unnecessary to call this before parsing the first sdl tree but would not be harmful.
   /// It does not reset the namespace/name/values/attributes because those will
-  /// be reset by the parser on the next call to parseSdlTag when it calls resetForNextTag().
+  /// be reset by the parser on the next call to parseSdlTag when it calls $(D resetForNextTag()).
   void resetForReuse() {
     depth = 0;
     line = 1;
@@ -365,6 +405,8 @@ struct Tag {
   }
 
 
+
+
   //
   // User Methods
   //
@@ -374,35 +416,27 @@ struct Tag {
   void throwIsDuplicate() {
     throw new SdlParseException(line, format("tag '%s' appeared more than once", name));
   }
-  void getOneValue(T)(ref T t) {
+  void getOneValue(T)(ref T value) {
     if(values.data.length != 1)
       throw new SdlParseException(line, format("tag '%s' must have exactly 1 value but had %s", name, values.data.length));
+
     const(char)[] literal = values.data[0];
+
+
     static if( isSomeString!T ) {
-      if(!t.empty) throwIsDuplicate();
-      if(literal[0] != '"') throw new SdlParseException(line, format("tag '%s' must have exactly one string literal but had another literal type", name));
-      t = literal[1..$-1]; // remove surrounding quotes
-/+
-    } else static if( isUnsigned!T ) {
-	//if(literal[0] == '-') throw new SdlParseException(line, format("tag '%s' cannot convert the negative sdl value '%s' to %s", name, literal, typeid(T)));
-	return to!T(literal);
-+/
-//    } else static if( isNumeric(T) ) {
-//	return to!T(literal);
+
+      if(!value.empty) throwIsDuplicate();
+
+    } else static if( isIntegral!T || isFloatingPoint!T ) {
+
+	//if( value != 0 ) throwIsDuplicate();
+
     } else {
-      t = to!T(literal);
-      //assert(0, format("Cannot convert sdl literal to D '%s' type", typeid(T)));
+
     }
+
+    if(!sdlLiteralToD!(T)(literal, value)) throw new SdlParseException(line, format("cannot convert '%s' to %s", literal, typeid(T)));
   }
-/+
-  const(char)[][] getValues() {
-    if(values.data.length == 0) throw new SdlParseException(line, format("tag '%s' must have at least 1 value", name));
-    //writefln("[DEBUG] values.data.length = %s", values.data.length);
-    const(char)[][] newValues = new const(char)[][values.data.length];
-    newValues[] = values.data;
-    return newValues;
-  }
-+/
 
   void getValues(T, bool allowAppend=false)(ref T[] t, size_t minCount = 1) {
     if(values.data.length < minCount) throw new SdlParseException(line, format("tag '%s' must have at least %s value(s)", name, minCount));
@@ -487,6 +521,62 @@ struct SdlParser(A)
 
 
 
+/// Converts literal to the given D type T.
+/// This is a wrapper arround the $(D sdlLiteralToD) function that returns true on sucess, except
+/// this function returns the value itself and throws an SdlParseException on error.
+T sdlLiteralToD(T)(const(char)[] literal) {
+  T value;
+  if(!sdlLiteralToD!(T)(literal, value))
+    throw new SdlParseException(format("failed to convert '%s' to a %s", literal, typeid(T)));
+  return value;
+}
+
+/// Converts literal to the given D type T.
+/// If isSomeString!T, then it will remove the surrounding quotes if they are present.
+/// Returns: true on succes, false on failure
+bool sdlLiteralToD(T)(const(char)[] literal, ref T t) {
+
+  assert(literal.length);
+
+
+  static if( is( T == bool) ) {
+
+    if(literal == "true" || literal == "on" || literal == "1") t = true;
+    if(literal == "false" || literal == "off" || literal == "0") t = false;
+
+  } else static if( isSomeString!T ) {
+
+  if(literal[0] == '"' && literal.length > 1 && literal[$-1] == '"') {
+    t = cast(T)literal[1..$-1];
+  } else {
+    t = cast(T)literal;
+  }
+
+  } else static if( isIntegral!T || isFloatingPoint!T ) {
+
+    // remove any postfix characters
+    while(true) {
+      char c = literal[$-1];
+      if(c >= '0' && c <= '9') break;
+      literal.length--;
+      if(literal.length == 0) return false;
+    }
+
+    t =  to!T(literal);
+
+  } else {
+      
+    t = to!T(literal);
+
+  }
+
+  return true;
+}
+
+
+
+
+
 string arrayRange(char min, char max, string initializer) {
   string initializers = "";
   for(char c = min; c < max; c++) {
@@ -516,30 +606,31 @@ string rangeInitializersNext(string[] s...) {
 }
 
 
-enum ubyte sdlIDFlag      = 0x01;
-enum ubyte sdlNumberFlag  = 0x02;
+enum ubyte sdlIDFlag             = 0x01;
+enum ubyte sdlNumberFlag         = 0x02;
+enum ubyte sdlNumberPostfixFlag  = 0x04;
 version(use_lookup_tables) {
   mixin("private __gshared ubyte[256] sdlLookup = "~rangeInitializers
 	("'_'"    , "sdlIDFlag",
 
 	 "'a'"    , "sdlIDFlag",
-	 "'b'"    , "sdlIDFlag | sdlNumberFlag",
+	 "'b'"    , "sdlIDFlag | sdlNumberFlag | sdlNumberPostfixFlag",
 	 "'c'"    , "sdlIDFlag",
-	 "'d'"    , "sdlIDFlag | sdlNumberFlag",
+	 "'d'"    , "sdlIDFlag | sdlNumberFlag | sdlNumberPostfixFlag",
 	 "'e'"    , "sdlIDFlag",
-	 "'f'"    , "sdlIDFlag | sdlNumberFlag",
+	 "'f'"    , "sdlIDFlag | sdlNumberFlag | sdlNumberPostfixFlag",
 	 "'g'-'k'", "sdlIDFlag",
-	 "'l'"    , "sdlIDFlag | sdlNumberFlag",
+	 "'l'"    , "sdlIDFlag | sdlNumberFlag | sdlNumberPostfixFlag",
 	 "'m'-'z'", "sdlIDFlag",
 
 	 "'A'"    , "sdlIDFlag",
-	 "'B'"    , "sdlIDFlag | sdlNumberFlag",
+	 "'B'"    , "sdlIDFlag | sdlNumberFlag | sdlNumberPostfixFlag",
 	 "'C'"    , "sdlIDFlag",
-	 "'D'"    , "sdlIDFlag | sdlNumberFlag",
+	 "'D'"    , "sdlIDFlag | sdlNumberFlag | sdlNumberPostfixFlag",
 	 "'E'"    , "sdlIDFlag",
-	 "'F'"    , "sdlIDFlag | sdlNumberFlag",
+	 "'F'"    , "sdlIDFlag | sdlNumberFlag | sdlNumberPostfixFlag",
 	 "'G'-'K'", "sdlIDFlag",
-	 "'L'"    , "sdlIDFlag | sdlNumberFlag",
+	 "'L'"    , "sdlIDFlag | sdlNumberFlag | sdlNumberPostfixFlag",
 	 "'M'-'Z'", "sdlIDFlag",
 
 	 "'0'-'9'", "sdlIDFlag | sdlNumberFlag",
@@ -547,6 +638,13 @@ version(use_lookup_tables) {
 	 "'.'"    , "sdlIDFlag | sdlNumberFlag",
 	 "'$'"    , "sdlIDFlag",
 	 )~";");
+}
+
+/// A convenience function to parse a single tag.
+/// Calls $(D tag.resetForReuse) and then calls $(D parseSdlTag).
+void parseOneSdlTag(Tag* tag, char[] sdlText) {
+  tag.resetForReuse();
+  if(!parseSdlTag(tag, &sdlText)) throw new SdlParseException(tag.line, format("The sdl text '%s' did not contain any tags", sdlText));
 }
 
 /// Parses one SDL tag (not including its children) from sdlText saving slices for every
@@ -618,7 +716,13 @@ bool parseSdlTag(Tag* tag, char[]* sdlText)
       return c < sdlLookup.length && ((sdlLookup[c] & sdlNumberFlag) != 0);
     } else {
       implement("isNumber without lookup table");
-      //return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '-' || c == '.' || c == '$';
+    }
+  }
+  bool isNumberPostfix() {
+    version(use_lookup_tables) {
+      return c < sdlLookup.length && ((sdlLookup[c] & sdlNumberPostfixFlag) != 0);
+    } else {
+      implement("isNumberPostfix without lookup table");
     }
   }
 
@@ -774,7 +878,7 @@ bool parseSdlTag(Tag* tag, char[]* sdlText)
 
       implement("tick strings");
 
-    } else if(c >= '0' && c <= '9' || c == '-') {
+    } else if(c >= '0' && c <= '9' || c == '-' || c == '.') {
 
       auto startOfNumber = cpos;
       while(true) {
@@ -788,9 +892,9 @@ bool parseSdlTag(Tag* tag, char[]* sdlText)
 	  literal = startOfNumber[0..cpos-startOfNumber];
 	  break;
 	}
+	if(tag.rejectTypedNumbers && isNumberPostfix())
+	  throw new SdlParseException(tag.line, "using this sdl mode, postfix characters indicating the type after a number are not allowed");
       }
-      
-      //implement("sdl numbers");
 
     } else if(c == 'n') {
 
@@ -1425,6 +1529,9 @@ unittest
     }
   }
 
+  
+
+
   //
   // String Literals
   //
@@ -1446,27 +1553,38 @@ unittest
   foreach(test; mixedValuesAndAttributesTests) {
     testInvalidSdl(test.copySdl, test.sdlText, SdlErrorType.mixedValuesAndAttributes);
   }
-  debug writefln("[TEST] setting allowMixedValuesAndAttributes = true;");
-  parsedTag.allowMixedValuesAndAttributes = true;
+  debug writefln("[TEST] settins SdlMode: Proposed");
+  parsedTag.useProposedSdl();
   foreach(test; mixedValuesAndAttributesTests) {
     testParseSdl(test.copySdl, test.sdlText, test.expectedTags);
   }
-  debug writefln("[TEST] resetting options to default");
-  parsedTag.resetOptions();
+  debug writefln("[TEST] settins SdlMode: Default");
+  parsedTag.useDefaultSdl();
 
 
+  //
+  // Test parsing numbers without extracting them
+  //
+  enum numberPostfixes = ["", "l", "L", "f", "F", "d", "D", "bd", "BD"];
   {
-    enum numberPrefixes = ["","-"];
-    enum numberPostfixes = ["l", "L", "f", "F", "d", "D", "bd", "BD"];
     enum sdlPostfixes = ["", " ", ";", "\n"];
+    
     auto numbers = ["0", "12", "9876", "5432", /*".1",*/ "0.1", "12.4", /*"1.",*/ "8.04",  "123.l"];
 
-    foreach(prefix; numberPrefixes) {
+
+    for(size_t negative = 0; negative < 2; negative++) {
+      string prefix = negative ? "-" : "";
+
       foreach(postfix; numberPostfixes) {
 	foreach(number; numbers) {
 
 	  auto testNumber = prefix~number~postfix;
 
+	  if(postfix.length) {
+	    parsedTag.useProposedSdl();
+	    testInvalidSdl(false, "tag "~testNumber);
+	    parsedTag.useStrictSdl();
+	  }
 	  //testInvalidSdl(false, "tag "~testNumber~"=");
 
 	  foreach(sdlPostfix; sdlPostfixes) {
@@ -1474,7 +1592,87 @@ unittest
 	  }
 	}
       }
+
+      
     }
+  }
+  
+  //
+  // Test parsing numbers and extracting them
+  //
+  {
+    for(size_t negative = 0; negative < 2; negative++) {
+      string prefix = negative ? "-" : "";
+
+      foreach(postfix; numberPostfixes) {
+
+	void testNumber(Types...)(ulong expectedValue) {
+	  long expectedSignedValue = negative ? -1 * (cast(long)expectedValue) : cast(long)expectedValue;
+
+	  foreach(Type; Types) {
+	    if(negative && isUnsigned!Type) continue;
+	    if(expectedSignedValue > Type.max) continue;
+	    static if( is(Type == float) || is(Type == double) || is(Type == real)) {
+	      if(expectedSignedValue < Type.min_normal) continue;
+	    } else {
+	      if(expectedSignedValue < Type.min) continue;
+	    }	       
+
+	    debug writefln("[DEBUG] testing %s on %s", typeid(Type), parsedTag.values.data[0]);
+	    Type t;
+	    parsedTag.getOneValue(t);
+	    assert(t == cast(Type) expectedSignedValue, format("Expected (%s) %s but got %s", typeid(Type), expectedSignedValue, t));
+	  }
+	}
+	void testDecimalNumber(Types...)(real expectedValue) {
+	  foreach(Type; Types) {
+	    if(negative && isUnsigned!Type) continue;
+	    if(expectedValue > Type.max) continue;
+	    static if( is(Type == float) || is(Type == double) || is(Type == real)) {
+	      if(expectedValue < Type.min_normal) continue;
+	    } else {
+	      if(expectedValue < Type.min) continue;
+	    }	       
+
+	    debug writefln("[DEBUG] testing %s on %s", typeid(Type), parsedTag.values.data[0]);
+	    Type t;
+	    parsedTag.getOneValue(t);
+	    assert(t - cast(Type) expectedValue < .01, format("Expected (%s) %s but got %s", typeid(Type), cast(Type)expectedValue, t));
+	  }
+	}
+
+	alias testNumber!(byte,ubyte,short,ushort,int,uint,long,ulong,float,double,real) testNumberOnAllTypes;
+	alias testDecimalNumber!(float,double,real) testDecimalNumberOnAllTypes;
+	
+	parseOneSdlTag(&parsedTag, cast(char[])"tag "~prefix~"0"~postfix);
+	testNumberOnAllTypes(0);
+
+	parseOneSdlTag(&parsedTag, cast(char[])"tag "~prefix~"1"~postfix);
+	testNumberOnAllTypes(1);
+
+	parseOneSdlTag(&parsedTag, cast(char[])"tag "~prefix~"12"~postfix);
+	testNumberOnAllTypes(12);
+
+	parseOneSdlTag(&parsedTag, cast(char[])"tag "~prefix~"9987"~postfix);
+	testNumberOnAllTypes(9987);
+
+	parseOneSdlTag(&parsedTag, cast(char[])"tag "~prefix~"0.0"~postfix);
+	testDecimalNumberOnAllTypes(0.0);
+
+	parseOneSdlTag(&parsedTag, cast(char[])"tag "~prefix~".1"~postfix);
+	testDecimalNumberOnAllTypes(0.1);
+
+	parseOneSdlTag(&parsedTag, cast(char[])"tag "~prefix~".000001"~postfix);
+	testDecimalNumberOnAllTypes(0.000001);
+
+	parseOneSdlTag(&parsedTag, cast(char[])"tag "~prefix~"100384.999"~postfix);
+	testDecimalNumberOnAllTypes(100384.999);
+
+	parseOneSdlTag(&parsedTag, cast(char[])"tag "~prefix~"3.14159265"~postfix);
+	testDecimalNumberOnAllTypes(3.14159265);
+      }	
+    }
+
   }
 
 
@@ -1490,13 +1688,13 @@ unittest
   foreach(test; braceAfterNewlineTests) {
     testInvalidSdl(test.copySdl, test.sdlText, SdlErrorType.braceAfterNewline);
   }
-  debug writefln("[TEST] setting allowBraceAfterNewline = true");
-  parsedTag.allowBraceAfterNewline = true;
+  debug writefln("[TEST] settins SdlMode: Proposed");
+  parsedTag.useProposedSdl();
   foreach(test; braceAfterNewlineTests) {
     testParseSdl(test.copySdl, test.sdlText, test.expectedTags);
   }
-  debug writefln("[TEST] resetting options to default");
-  parsedTag.resetOptions();
+  debug writefln("[TEST] settins SdlMode: Default");
+  parsedTag.useDefaultSdl();
 
 
   //
@@ -1828,8 +2026,6 @@ subPackage {
 }
 
 
-
-
 unittest
 {
   mixin(scopedTest!"SdlWalkerOnPerson");
@@ -1976,3 +2172,4 @@ person {
 }`, Person("Robert", 29, ["Bob", "Bobby"], [Person("Jack", 6, ["Little Jack"])]));
 
 }
+
