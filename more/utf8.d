@@ -2,6 +2,8 @@ module more.utf8;
 
 import std.stdio;
 
+import more.common;
+
 //
 // Utf8
 //
@@ -77,8 +79,10 @@ dchar bjoernDecodeUtf8(ref inout(char)* utf8, const char* limit) {
 }
 
 
-unittest
+version(unittest_utf8) unittest
 {
+  mixin(scopedTest!("utf8"));
+
   void testDecodeUtf8(string s, dchar[] expectedChars...) {
     dchar decoded;
     auto start = s.ptr;
@@ -103,7 +107,7 @@ unittest
 		 expected, expected, decoded, decoded);
 	assert(0);
       }
-      writefln("decodeUtf8('%s')", decoded);
+      debug writefln("decodeUtf8('%s')", decoded);
     }
   }
 

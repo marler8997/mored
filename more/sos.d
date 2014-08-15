@@ -57,9 +57,9 @@ template SosTypeNames(alias sep, T...)
   }
 }
 +/
-unittest
+version(unittest_sos) unittest
 {
-  startTest("Sos type name tests");
+  mixin(scopedTest!("Sos Types"));
 
   assertEqual("Void"   , SosTypeName!void);
 
@@ -123,8 +123,6 @@ unittest
   assertEqual("String[]", SosTypeName!(immutable(char[])[]));
   assertEqual("String[]", SosTypeName!(immutable char[][]));
   assertEqual("String[]", SosTypeName!(string[]));
-
-  endTest("Sos type name tests");
 }
 /+
 template SosTypeNameStrings(T...)
@@ -188,8 +186,10 @@ public class SosMethodDefinition
 
 
 
-unittest
+version(unittest_sos) unittest
 {
+  mixin(scopedTest!("Sos Method Definitions"));
+
   void testFunction1(int a, string b)
   {
   }
@@ -199,8 +199,5 @@ unittest
 
   writefln("Definition = '%s'", definition1.definition);
   assertEqual("Void testFunction1(String)", definition1.definition);
-
-
-
 
 }

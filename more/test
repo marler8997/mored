@@ -1,9 +1,2 @@
 #!/bin/sh
-
-set -e # exit on error
-
-MORE_FLAGS=-cov
-
-dmd -ofunittest -main -unittest $MORE_FLAGS -I.. sdl.d common.d utf8.d
-
-./unittest
+rdmd -debug -I.. test.d $@

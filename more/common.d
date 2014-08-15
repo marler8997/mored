@@ -10,13 +10,38 @@ import core.exception;
 
 import std.c.string : memmove;
 
-void implement() {
-  throw new Exception("not implemented");
-}
-void implement(string feature) {
-  throw new Exception(feature~" not implemented");
+version(unittest)
+{
+  import std.array;
 }
 
+
+void implement(string feature = "", string file = __FILE__, int line = __LINE__) {
+  string msg = "not implemented";
+  if(feature.length) {
+    msg = feature~' '~msg;
+  }
+  throw new Exception(msg, file, line);
+}
+
+float stdTimeMillis(long stdTime)
+{
+  return cast(float)stdTime / 10000f;
+}
+string prettyTime(float millis)
+{
+  if (millis < 0) return "-"~prettyTime(-millis);
+    
+  if (millis < 1000)
+    return to!string(millis)~" millis";
+  if (millis < 60000)
+    return to!string(millis / 1000)~" seconds";
+  if (millis < 3600000)
+    return to!string(millis / 60000)~" minutes";
+  if (millis < 86400000)
+    return to!string(millis / 3600000)~" hours";
+  return to!string(millis / 86400000)~" days";
+}
 
 template isChar(T) {
   static if(is(T == char) ||
@@ -58,30 +83,37 @@ public interface IDisposable
 }
 
 
-
+enum outerBar = "=========================================";
+enum innerBar = "-----------------------------------------";
 void startTest(string name)
 {
-  writeSection(name ~ ": Start");
+  writeln(outerBar);
+  writeln(name, ": Start");
+  writeln(innerBar);
 }
 void endFailedTest(string name)
 {
-  writeSection(name ~ ": Failed");
+  writeln(innerBar);
+  writeln(name, ": Failed");
+  writeln(outerBar);
 }
 void endPassedTest(string name)
 {
-  writeSection(name ~ ": Passed");
+  writeln(innerBar);
+  writeln(name, ": Passed");
+  writeln(outerBar);
 }
 template scopedTest(string name) {
   enum scopedTest =
     "startTest(\""~name~"\");"~
-    "scope(failure) endFailedTest(\""~name~"\");"~
+    "scope(failure) {stdout.flush();endFailedTest(\""~name~"\");}"~
     "scope(success) endPassedTest(\""~name~"\");";
 }
 void writeSection(string name)
 {
-  writeln("----------------------------------------");
+  writeln(innerBar);
   writeln(name);
-  writeln("----------------------------------------");
+  writeln(innerBar);
 }
 void assertEqual(string expected, string actual) pure
 {
@@ -156,8 +188,10 @@ void trimNewline(inout(char)[]* line) {
 }
 
 
-unittest
+version(unittest_common) unittest
 {
+  mixin(scopedTest!("trimNewline"));
+
   void testTrimNewline(string s, string expected) {
     //writef("'%s' => ", escape(s));
     trimNewline(&s);
@@ -171,6 +205,7 @@ unittest
   testTrimNewline("1234", "1234");
   testTrimNewline("abcd  \n", "abcd  ");
   testTrimNewline("hello\r\r\r\n\n\r\r\n", "hello");
+
 }
 
 
@@ -316,8 +351,10 @@ struct CustomLineParser
 }
 
 }
-unittest
+version(unittest_common) unittest
 {
+  mixin(scopedTest!("LineParser"));
+
   void TestLineParser(LineParser lineParser)
   {
     lineParser.put("\n");
@@ -390,13 +427,9 @@ unittest
     assert(!lineParser.getLine());
   }
 
-  writeSection("Line Parser Tests: Start");
-
   TestLineParser(LineParser([],1));
   TestLineParser(LineParser([0,0,0], 3));
   TestLineParser(LineParser(new ubyte[256]));
-
-  writeSection("Line Parser Tests: Passed");
 }
 
 
@@ -480,11 +513,9 @@ string tryParseFields(string comment = "#", T, C)(T fields, C[] line) if(isOutpu
   }
 }
 
-unittest
+version(unittest_common) unittest
 {
-  import std.stdio;
-  import std.array;
-  import std.string;
+  mixin(scopedTest!("tryParseFields"));
 
   string line;
   auto fields = appender!(string[])();
@@ -564,38 +595,38 @@ struct ArrayList(V)
 
 immutable string[] escapeTable =
   [
-   "\0"  ,
-   "\x01",
-   "\x02",
-   "\x03",
-   "\x04",
-   "\x05",
-   "\x06",
-   "\a",  // Bell
-   "\b",  // Backspace
-   "\t",
-   "\n",
-   "\v",  // Vertical tab
-   "\f",  // Form feed
-   "\r",
-   "\x0E",
-   "\x0F",
-   "\x10",
-   "\x11",
-   "\x12",
-   "\x13",
-   "\x14",
-   "\x15",
-   "\x16",
-   "\x17",
-   "\x18",
-   "\x19",
-   "\x1A",
-   "\x1B",
-   "\x1C",
-   "\x1D",
-   "\x1E",
-   "\x1F",
+   "\\0"  ,
+   "\\x01",
+   "\\x02",
+   "\\x03",
+   "\\x04",
+   "\\x05",
+   "\\x06",
+   "\\a",  // Bell
+   "\\b",  // Backspace
+   "\\t",
+   "\\n",
+   "\\v",  // Vertical tab
+   "\\f",  // Form feed
+   "\\r",
+   "\\x0E",
+   "\\x0F",
+   "\\x10",
+   "\\x11",
+   "\\x12",
+   "\\x13",
+   "\\x14",
+   "\\x15",
+   "\\x16",
+   "\\x17",
+   "\\x18",
+   "\\x19",
+   "\\x1A",
+   "\\x1B",
+   "\\x1C",
+   "\\x1D",
+   "\\x1E",
+   "\\x1F",
    " ", //
    "!", //
    "\"", //
@@ -704,17 +735,6 @@ immutable string[] escapeTable =
 string escape(char c) {
   return escapeTable[c];
 }
-unittest
-{
-  import std.stdio;
-  assert (char.max == escapeTable.length - 1);
-
-  for(auto c = ' '; c <= '~'; c++) {
-    //writefln("%s == %s", c, escape(c)[0]);
-    assert(c == escape(c)[0]);
-  }
-}
-
 inout(char)[] escape(inout(char)[] str) pure {
   size_t extra = 0;
   foreach(c; str) {
@@ -755,6 +775,27 @@ inout(char)[] escape(inout(char)[] str) pure {
 
   return cast(inout(char)[])newString;
 }
+version(unittest_common) unittest
+{
+  mixin(scopedTest!("escape"));
+
+  assert (char.max == escapeTable.length - 1);
+
+  for(auto c = ' '; c <= '~'; c++) {
+    assert(c == escape(c)[0]);
+  }
+  assert("\\0" == escape(0));
+  assert("\\r" == escape('\r'));
+  assert("\\n" == escape('\n'));
+  assert("\\t" == escape('\t'));
+
+
+  assert("\\r" == escape("\r"));
+  assert("\\t" == escape("\t"));
+  assert("\\n" == escape("\n"));
+  assert("\\\\" == escape("\\"));
+}
+
 
 //alias void delegate(const char[] str) CharWriter;
 struct StdoutWriter
