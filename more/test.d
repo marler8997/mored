@@ -141,6 +141,12 @@ int main(string[] args) {
       addFile("utf8.d"         , false, false);
       addFile("sdl.d"          , debug_, true);
 
+    } else if(module_ == "sdl2") {
+
+      addFile("common.d"       , false, false);
+      addFile("utf8.d"         , false, false);
+      addFile("sdl2.d"         , debug_, true);
+
     } else if(module_ == "sdlreflection") {
 
       addFile("common.d"       , false, false);

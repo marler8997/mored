@@ -735,6 +735,9 @@ immutable string[] escapeTable =
 string escape(char c) {
   return escapeTable[c];
 }
+string escape(dchar c) {
+  return (c < escapeTable.length) ? escapeTable[c] : to!string(c);
+}
 inout(char)[] escape(inout(char)[] str) pure {
   size_t extra = 0;
   foreach(c; str) {

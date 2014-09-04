@@ -1,5 +1,6 @@
 import std.stdio;
 import std.datetime;
+import std.variant;
 
 import more.utf8;
 
@@ -84,6 +85,25 @@ struct ABCStructConstructor {
 }
 
 
+struct ABCDStruct {
+  int a, b, c, d;
+}
+alias Algebraic!(ABCStruct, ABCDStruct) AlgebraicStruct;
+enum ABCType : byte { ABC, ABCD };
+struct ABCDEnumStruct {
+  ABCType type;
+  int a, b, c, d;
+}
+
+ABCDStruct abcdStruct;
+ABCDEnumStruct abcdEnumStruct = ABCDEnumStruct(ABCType.ABCD);
+AlgebraicStruct algebraicStruct;// = AlgebraicStruct(ABCDStruct());
+
+bool b;
+dchar letterAdchar = 'A';
+
+
+
 version(sdl) {
 
   string testSdlString = `
@@ -125,6 +145,8 @@ ABCStruct *ModifyByPointerAndReturn(ABCStruct *s) {
 
 void main(string[] args)
 {
+  algebraicStruct = AlgebraicStruct(ABCDStruct());
+
   int i, iterations;
   uint run;
   long before;
@@ -166,6 +188,18 @@ void main(string[] args)
 	   "MarlerUtf8Decode"       , "string str = testStringA; auto start = str.ptr; decodeUtf8(start, str.ptr + str.length);",
 	   "BjoernUtf8Decode"       , "string str = testStringA; auto start = str.ptr; bjoernDecodeUtf8(start, str.ptr + str.length);"
 	   )("Marler vs Bjoern Utf8 Decode", runCount, 1000000);
+
+  TestRun!(
+	   "Algebraic"       , "ABCDStruct* s = algebraicStruct.peek!ABCDStruct();if(s != null) s.a = 3;",
+	   "Enum"            , "ABCDEnumStruct * s = (abcdEnumStruct.type == ABCType.ABCD) ? &abcdEnumStruct : null;s.a = 3;"
+	   )("Albebraic vs Enum", runCount, 1000000);
+
+
+  TestRun!(
+	   "And"              , "b = (letterAdchar & 0x80) == 0;",
+	   "LessThan"         , "b = (letterAdchar < 0x7F);",
+	   )("And vs LessThan", runCount, 10000000);
+
 
 
   version(sdl) {
