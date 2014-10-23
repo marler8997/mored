@@ -5,6 +5,8 @@ import std.conv;
 import std.range;
 import std.stdio;
 import std.string;
+import std.bitmanip;
+import std.format;
 
 import core.exception;
 
@@ -207,7 +209,6 @@ version(unittest_common) unittest
   testTrimNewline("hello\r\r\r\n\n\r\r\n", "hello");
 
 }
-
 
 
 void readFullSize(File file, char[] buffer) {
@@ -534,10 +535,6 @@ version(unittest_common) unittest
 }
 
 
-
-
-
-
 void bigEndianSetUshort(ubyte* bytes, ushort value)
 {
   *bytes       = cast(ubyte)(value >> 8);
@@ -836,6 +833,7 @@ struct WriteBuffer(T)
   }
 }
 
+alias void delegate(char[] chars) CharWriter;
 
 alias size_t delegate(char[] buffer) CharReader;
 alias size_t delegate(ubyte[] buffer) DataReader;
@@ -903,3 +901,159 @@ struct AsciiBufferedInput
 
 }
 
+
+struct FormattedBinaryWriter
+{
+  scope void delegate(const(char)[]) sink;
+
+  ubyte[] columnBuffer;
+
+
+  string offsetFormat;
+  mixin(bitfields!
+	(bool, "hex", 1,
+	 bool, "text", 1,
+	 void, "", 6));
+
+  size_t cachedData;
+
+  uint offset;
+
+  this(scope void delegate(const(char)[]) sink, ubyte[] columnBuffer,
+       ubyte offsetTextWidth = 8, bool hex = true, bool text = true) {
+    this.sink = sink;
+    this.columnBuffer = columnBuffer;
+
+    if(offsetTextWidth == 0) {
+      offsetFormat = null;
+    } else {
+      offsetFormat = "%0"~to!string(offsetTextWidth)~"x";
+    }
+
+    this.hex = hex;
+    this.text = text;
+  }
+
+  void writeAscii(byte b) {
+    if(b <= '~' && b >= ' ') {
+      sink((cast(char*)&b)[0..1]);
+    } else {
+      sink(".");
+    }
+  }
+
+  void writeRow(T)(T data) {
+    bool atFirst = true;
+    void prefix() {
+      if(atFirst) {atFirst = false; }
+      else { sink(" "); }
+    }
+    if(offsetFormat) {
+      prefix();
+      formattedWrite(sink, offsetFormat, offset);
+    }
+
+    if(hex) {
+      prefix();
+      foreach(b; data) {
+	formattedWrite(sink, " %02x", b);
+      }
+    }
+
+    if(text) {
+      prefix();
+      foreach(b; data) {
+	writeAscii(b);
+      }
+    }
+
+    sink("\n");
+    offset += columnBuffer.length;
+  }
+  void finish() {
+    if(cachedData > 0) {
+      bool atFirst = true;
+      void prefix() {
+	if(atFirst) {atFirst = false; }
+	else { sink(" "); }
+      }
+      if(offsetFormat) {
+	prefix();
+	formattedWrite(sink, offsetFormat, offset);
+      }
+
+      if(hex) {
+	prefix();
+	foreach(b; columnBuffer[0..cachedData]) {
+	  formattedWrite(sink, " %02x", b);
+	}
+	foreach(b; cachedData..columnBuffer.length) {
+	  sink("   ");
+	}
+      }
+
+      if(text) {
+	prefix();
+	foreach(b; columnBuffer[0..cachedData]) {
+	  writeAscii(b);
+	}
+      }
+
+      sink("\n");
+      offset += columnBuffer.length;
+    }
+  }
+  void put(scope ubyte[] data) {
+    if(cachedData > 0) {
+      implement();
+    }
+
+    while(data.length >= columnBuffer.length) {
+      writeRow(data[0..columnBuffer.length]);
+      data = data[columnBuffer.length..$];
+    }
+      
+    if(data.length > 0) {
+      columnBuffer[0..data.length][] = data;
+      cachedData = data.length;
+    }
+  }
+}
+
+
+
+//
+// Range Initializers
+//
+string arrayRange(char min, char max, string initializer) {
+  string initializers = "";
+  for(char c = min; c < max; c++) {
+    initializers ~= "'"~c~"': "~initializer~",\n";
+  }
+  initializers ~= "'"~max~"': "~initializer;
+  return initializers;
+}
+string rangeInitializers(string[] s...) {
+  if(s.length % 2 != 0) assert(0, "must supply an even number of arguments to rangeInitializers");
+  string code = "["~rangeInitializersCurrent(s);
+  //assert(0, code); // uncomment to see the code
+  return code;
+}
+string rangeInitializersCurrent(string[] s) {
+  string range = s[0];
+  if(range[0] == '\'') {
+    if(range.length == 3 || (range.length == 4 && range[1] == '\\')) {
+      if(range[$-1] != '\'') throw new Exception(format("a single-character range %s started with an apostrophe (') but did not end with one", range));
+      return range ~ ":" ~ s[1] ~ rangeInitializersNext(s);
+    }
+  } else {
+    throw new Exception(format("range '%s' not supported", range));
+  }
+  char min = range[1];
+  char max = range[5];
+  return arrayRange(min, max, s[1]) ~ rangeInitializersNext(s);
+}
+string rangeInitializersNext(string[] s...) {
+  if(s.length <= 2) return "]";
+  return ",\n"~rangeInitializersCurrent(s[2..$]);
+}

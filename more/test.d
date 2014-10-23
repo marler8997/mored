@@ -135,6 +135,19 @@ int main(string[] args) {
       addFile("common.d"       , false, false);
       addFile("utf8.d"       , debug_, true);
 
+    } else if(module_ == "fields") {
+
+      addFile("common.d"       , false, false);
+      addFile("utf8.d"         , false, false);
+      addFile("fields.d"       , debug_, true);
+
+      /*
+    } else if(module_ == "ason") {
+
+      addFile("common.d"       , false, false);
+      addFile("utf8.d"         , false, false);
+      addFile("ason.d"         , debug_, true);
+      */
     } else if(module_ == "sdl") {
 
       addFile("common.d"       , false, false);

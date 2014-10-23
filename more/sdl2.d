@@ -1587,41 +1587,6 @@ bool sdlLiteralToD(T)(const(char)[] literal, ref T t) {
 
 
 
-
-string arrayRange(char min, char max, string initializer) {
-  string initializers = "";
-  for(char c = min; c < max; c++) {
-    initializers ~= "'"~c~"': "~initializer~",\n";
-  }
-  initializers ~= "'"~max~"': "~initializer;
-  return initializers;
-}
-string rangeInitializers(string[] s...) {
-  if(s.length % 2 != 0) assert(0, "must supply an even number of arguments to rangeInitializers");
-  string code = "["~rangeInitializersCurrent(s);
-  //assert(0, code); // uncomment to see the code
-  return code;
-}
-string rangeInitializersCurrent(string[] s) {
-  string range = s[0];
-  if(range[0] == '\'') {
-    if(range.length == 3 || (range.length == 4 && range[1] == '\\')) {
-      if(range[$-1] != '\'') throw new Exception(format("a single-character range %s started with an apostrophe (') but did not end with one", range));
-      return range ~ ":" ~ s[1] ~ rangeInitializersNext(s);
-    }
-  } else {
-    throw new Exception(format("range '%s' not supported", range));
-  }
-  char min = range[1];
-  char max = range[5];
-  return arrayRange(min, max, s[1]) ~ rangeInitializersNext(s);
-}
-string rangeInitializersNext(string[] s...) {
-  if(s.length <= 2) return "]";
-  return ",\n"~rangeInitializersCurrent(s[2..$]);
-}
-
-
 enum ubyte sdlIDFlag                  = 0x01;
 enum ubyte sdlNumberFlag              = 0x02;
 enum ubyte sdlNumberPostfixFlag       = 0x04;

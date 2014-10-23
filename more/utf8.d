@@ -1,8 +1,10 @@
 module more.utf8;
 
-import std.stdio;
 
-import more.common;
+version(unittest_utf8) {
+  import std.stdio;
+  import more.common;
+}
 
 version(unittest_utf8)
 {
