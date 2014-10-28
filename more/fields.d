@@ -47,6 +47,17 @@ struct Text
       c = decodeUtf8(this.next, this.limit);
     }
   }
+  @property bool empty() {
+    return cpos >= limit;
+  }
+
+  void skipChar() {
+    cpos = next;
+    if(next < limit) {
+      c = decodeUtf8(next, limit);
+    }
+  }
+
   void toNextLine()
   {
     while(true) {
@@ -87,10 +98,24 @@ struct Text
 	c = decodeUtf8(next, limit); 
 	column++;
 	if(isControlChar(c)) {
-	  break;
-	}
-      }
 
+	  // Handle slashes that aren't comments
+	  if(c != '/') break;
+	  if(next >= limit) {
+	    cpos = next;
+	    break;
+	  }
+	  auto saveNext = next;
+	  c = decodeUtf8(next, limit);
+	  next = saveNext;
+	  
+	  if(c == '*' || c == '/') {
+	    break;
+	  }
+
+	}
+
+      }
     }
   }
 
@@ -218,20 +243,36 @@ struct Text
     return cpos >= limit || c == '\n';
   }
 
+
+  void parseString(ref FieldToken token)
+  {
+    skipWhitespaceAndComments(true);
+    token.lineNumber = lineNumber;
+    token.column = column;
+    if(cpos >= limit || isControlChar(c)) {
+      token.text = null;
+    } else {
+      const(char)* startOfToken = cpos;
+      toEndOfToken();
+      token.text = startOfToken[0..cpos-startOfToken];
+    }
+  }
+
+
+  alias parseString parseObjectFieldName;
+
   // An object starts with an open curly brace '{' or omits its curly
   // brace section with a semi-colon ';'
   // A 'NamelessObjectField' is a field before the curly-brace section
   void parseNamelessObjectField(ref FieldToken token)
   {
     skipWhitespaceAndComments(true);
+    token.lineNumber = lineNumber;
+    token.column = column;
     if(cpos >= limit || isControlChar(c)) {
       token.text = null;
-      token.lineNumber = lineNumber;
-      token.column = column;
     } else {
       const(char)* startOfToken = cpos;
-      token.lineNumber = lineNumber;
-      token.column = column;
       toEndOfToken();
       token.text = startOfToken[0..cpos-startOfToken];
     }
@@ -247,7 +288,6 @@ struct Text
     }
     return true;
   }
-
 }
 
 
@@ -478,6 +518,7 @@ mixin("private __gshared immutable ubyte[256] charLookup = "~rangeInitializers
        `'\r'`   , "controlCharFlag | whitespaceFlag",
        `'{'`    , "controlCharFlag",
        `'}'`    , "controlCharFlag",
+       
        `'['`    , "controlCharFlag",
        `']'`    , "controlCharFlag",
        //`';'`    , "controlCharFlag",
@@ -487,7 +528,6 @@ mixin("private __gshared immutable ubyte[256] charLookup = "~rangeInitializers
 
 
        )~";");
-
 
 version(unittest_fields) unittest
 {

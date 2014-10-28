@@ -797,7 +797,6 @@ version(unittest_common) unittest
 }
 
 
-//alias void delegate(const char[] str) CharWriter;
 struct StdoutWriter
 {
   void put(const (char)[] str) {
@@ -833,7 +832,7 @@ struct WriteBuffer(T)
   }
 }
 
-alias void delegate(char[] chars) CharWriter;
+alias void delegate(const(char)[] msg) const Writer;
 
 alias size_t delegate(char[] buffer) CharReader;
 alias size_t delegate(ubyte[] buffer) DataReader;

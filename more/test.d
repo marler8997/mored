@@ -109,7 +109,7 @@ int main(string[] args) {
     return 1;
   }
 
-  version(windows) {
+  version(Windows) {
     enum executableName = "unittest.exe";
   } else {
     enum executableName = "unittest";
@@ -129,6 +129,19 @@ int main(string[] args) {
     } else if(module_ == "common") {
 
       addFile("common.d"       , debug_, true);
+
+    } else if(module_ == "path") {
+
+      addFile("common.d"       , false, false);
+      addFile("path.d"         , debug_, true);
+
+    } else if(module_ == "repos") {
+
+      addFile("common.d"        , false, false);
+      addFile("utf8.d"          , false, false);
+      addFile("fields.d"        , false, false);
+      addFile("path.d"          , false, false);
+      addFile("repos.d"         , debug_, true);
 
     } else if(module_ == "utf8") {
 
@@ -224,8 +237,13 @@ int main(string[] args) {
 
   if(!exec(buildCommand.data)) return 1;
   
-  if(unittest_)
-    spawn("unittest.exe");
+  if(unittest_) {
+    version(Windows) {
+      spawn(executableName);
+    } else {
+      spawn("./"~executableName);
+    }
+  }
 
   return 0;
 }
