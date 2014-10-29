@@ -837,6 +837,14 @@ alias void delegate(const(char)[] msg) const Writer;
 alias size_t delegate(char[] buffer) CharReader;
 alias size_t delegate(ubyte[] buffer) DataReader;
 
+struct FileCharReader
+{
+  File file;
+  size_t read(char[] buffer) {
+    return file.rawRead(buffer).length;
+  }
+}
+
 struct AsciiBufferedInput
 {
   CharReader reader;
@@ -1055,4 +1063,406 @@ string rangeInitializersCurrent(string[] s) {
 string rangeInitializersNext(string[] s...) {
   if(s.length <= 2) return "]";
   return ",\n"~rangeInitializersCurrent(s[2..$]);
+}
+
+
+
+struct StringByLine
+{
+  string s;
+  size_t startOfLineOffset;
+  size_t endOfLineOffset;
+  this(string s) @safe pure nothrow @nogc
+  {
+    this.s = s;
+    this.startOfLineOffset = 0;
+    this.endOfLineOffset = 0;
+    popFront;
+  }
+  @property bool empty() pure nothrow @safe @nogc
+  {
+    return startOfLineOffset >= s.length;
+  }
+  @property auto front() pure nothrow @safe @nogc
+  {
+    return s[startOfLineOffset..endOfLineOffset];
+  }
+  @property void popFront() pure nothrow @safe @nogc
+  {
+    if(startOfLineOffset < s.length) {
+      startOfLineOffset = endOfLineOffset;
+      while(true) {
+	if(endOfLineOffset >= s.length) break;
+	if(s[endOfLineOffset] == '\n') {
+	  endOfLineOffset++;
+	  break;
+	}
+	endOfLineOffset++;
+      }
+    }
+  }
+}
+auto byLine(string s) pure nothrow @safe @nogc {
+  return StringByLine(s);
+}
+version(unittest_common) unittest
+{
+  mixin(scopedTest!("StringByLine"));
+  
+  void test(string[] expectedStrings, string s, size_t testLine = __LINE__)
+  {
+    auto stringByLine = s.byLine();
+
+    foreach(expectedString; expectedStrings) {
+      if(stringByLine.empty) {
+	writefln("Expected string '%s' but no more strings", escape(expectedString));
+	assert(0);
+      }
+      if(expectedString != stringByLine.front) {
+	writefln("Expected: '%s'", escape(expectedString));
+	writefln("Actual  : '%s'", escape(stringByLine.front));
+	assert(0);
+      }
+      stringByLine.popFront;
+    }
+
+    if(!stringByLine.empty) {
+      writefln("Expected no more strings but got another '%s'", escape(stringByLine.front));
+      assert(0);
+    }
+  }
+
+  test([], "");
+  test(["a"], "a");
+  test(["a\n"], "a\n");
+  test(["abc"], "abc");
+  test(["abc\n"], "abc\n");
+
+  test(["abc\n", "123"], "abc\n123");
+  test(["abc\n", "123\n"], "abc\n123\n");
+
+}
+
+
+
+enum BufferTooSmall
+{
+  returnPartialData,
+  throwException,
+  resizeBuffer,
+}
+
+/**
+   The LinesChunker reads as many lines as it can.  If the buffer runs out in the
+   middle of a line it will return all the previous full lines.  On the next
+   read it will move the left over data to the beginning of the buffer and continue reading.
+   If it cannot read a full line it will either return partial lines or it will throw an
+   error depending on what the user specifies.
+   Options on how to handle lines that are too long
+     1. Return partial lines
+     2. Resize the buffer to hold the entire line
+     3. Throw an exception/cause an error
+*/
+struct LinesChunker
+{
+  char[] buffer;
+  BufferTooSmall tooSmall;
+  private char[] leftOver;
+  
+  this(char[] buffer, BufferTooSmall tooSmall) {
+    this.buffer = buffer;
+    this.tooSmall = tooSmall;
+  }
+  size_t read(CharReader reader)
+  {
+    //
+    // Handle leftOver Data
+    //
+    size_t bufferOffset;
+    if(leftOver.length == 0) {
+      bufferOffset = 0;
+    } else {
+      // TODO: do I need this check? Can this ever happen?
+      if(leftOver.ptr != buffer.ptr) {
+	memmove(buffer.ptr, leftOver.ptr, leftOver.length);
+      }
+      bufferOffset = leftOver.length;
+      leftOver = null;
+    }
+
+    //
+    // Read More Data
+    //
+    while(true) {
+      if(bufferOffset >= buffer.length) {
+	if(tooSmall == BufferTooSmall.returnPartialData) {
+	  return bufferOffset;
+	} else if(tooSmall == BufferTooSmall.resizeBuffer) {
+	  throw new Exception("BufferTooSmall.resizeBuffer is not implemented in LinesChunker");
+	}
+	throw new Exception(format("the current buffer of length %s is too small to hold the current line", buffer.length));
+      }
+
+      size_t readLength = reader(buffer[bufferOffset .. $]);
+      if(readLength == 0) return bufferOffset;
+
+      auto totalLength = bufferOffset + readLength;
+      auto i = totalLength - 1;
+      while(true) {
+	auto c = buffer[i];
+	if(c == '\n') {
+	  leftOver = buffer[i+1..totalLength];
+	  return i+1;
+	}
+	if(i == bufferOffset) {
+	  break;
+	}
+	i--;
+      }
+
+      bufferOffset = totalLength;
+    }
+  }
+}
+
+version(unittest_common)
+{
+  struct CustomChunks {
+    string[] chunks;
+    size_t chunkIndex;
+    size_t read(char[] buffer) {
+      if(chunkIndex >= chunks.length) return 0;
+      auto chunk = chunks[chunkIndex++];
+      if(chunk.length > buffer.length) {
+	assert(0, format("Chunk at index %s is %s bytes but the buffer is only %s", chunkIndex, chunk.length, buffer.length));
+      }
+      buffer[0..chunk.length] = chunk;
+      return chunk.length;
+    }
+  }
+}
+struct LinesReader
+{
+  CharReader reader;
+  LinesChunker chunker;
+  size_t currentBytes;
+  this(CharReader reader, char[] buffer, BufferTooSmall tooSmall)
+  {
+    this.reader = reader;
+    this.chunker = LinesChunker(buffer, tooSmall);
+    this.currentBytes = this.chunker.read(reader);
+  }
+  @property empty()
+  {
+    return currentBytes == 0;
+  }
+  @property char[] front() {
+    return chunker.buffer[0..currentBytes];
+  }
+  @property void popFront() {
+    this.currentBytes = this.chunker.read(reader);
+  }
+}
+auto byLines(CharReader reader, char[] buffer, BufferTooSmall tooSmall) {
+  return LinesReader(reader, buffer, tooSmall);
+}
+auto byLines(File file, char[] buffer, BufferTooSmall tooSmall) {
+  auto fileCharReader = FileCharReader(file);
+  return LinesReader(&(fileCharReader.read), buffer, tooSmall);
+}
+
+
+version(unittest_common) unittest
+{
+  mixin(scopedTest!("LinesChunker/LinesReader"));
+
+  CustomChunks customChunks;
+  char[5] buffer5;
+  char[256] buffer256;
+
+  void testLinesChunkerCustom(string[] expectedChunks, CharReader reader, char[] chunkerBuffer = buffer256, size_t testLine = __LINE__)
+  {
+    auto lineChunker = LinesChunker(chunkerBuffer, BufferTooSmall.throwException);
+
+    foreach(expectedChunk; expectedChunks) {
+      size_t actualLength = lineChunker.read(reader);
+      if(chunkerBuffer[0..actualLength] != expectedChunk) {
+	writefln("Expected: '%s'", escape(expectedChunk));
+	writefln("Actual  : '%s'", escape(chunkerBuffer[0..actualLength]));
+	assert(0);
+      }
+/+
+      debug {
+	writefln("
+      }
++/
+    }
+  }
+  void testLinesChunker(string[] expectedChunks, string[] customChunkStrings, char[] chunkerBuffer = buffer256, size_t testLine = __LINE__)
+  {
+    writefln("testLinesChunker %s %s", expectedChunks, customChunkStrings);
+
+    customChunks = CustomChunks(customChunkStrings);
+    testLinesChunkerCustom(expectedChunks, &(customChunks.read), chunkerBuffer, testLine);
+  }
+  
+  
+  testLinesChunker(["a\n"], ["a\n"]);
+  testLinesChunker(["a\n", "b"], ["a\nb"], buffer5); // NOTE: One would think that this should return one chunk, however,
+                                                     //       This simulates the case when the reader returned the available
+                                                     //       data so there's no way for the chunker to know if there is another newline
+                                                     //       coming at the next read call so it just returns the currently known lines
+
+  testLinesChunker(["a\nb\r\nc\n"], ["a\nb\r\nc\n"]);
+  testLinesChunker(["a\nb\r\nc\n", "d"], ["a\nb\r\nc\nd"]);
+  testLinesChunker(["123\n", "123\n"], ["123\n1", "23\n"], buffer5);
+  testLinesChunker(["123\n", "123"], ["123\n1", "23"], buffer5);
+
+  //
+  // Test LinesReader
+  //
+/+
+  void testByLines(string[] expectedChunks, string[] customChunkStrings, char[] cunkBuffer = buffer256, size_t testLine = __LINE__)
+  {
+    
+  }
++/
+  customChunks = CustomChunks(["a\nb"]);
+  foreach(lines; (&(customChunks.read)).byLines(buffer5, BufferTooSmall.throwException)) {
+    writefln("lines: '%s'", escape(lines));
+  }
+}
+
+
+struct LineReader
+{
+  CharReader reader;
+  LinesChunker chunker;
+
+  size_t dataLength;
+  char[] line;
+  size_t endOfLineOffset;
+
+  this(CharReader reader, char[] buffer, BufferTooSmall tooSmall) {
+    this.reader = reader;
+    this.chunker = LinesChunker(buffer, tooSmall);
+
+    this.dataLength = this.chunker.read(reader);
+    this.line = null;
+    this.endOfLineOffset = 0;
+    popFront();
+  }
+  @property bool empty()
+  {
+    return line is null;
+  }
+  @property auto front()
+  {
+    return line;
+  }
+  @property void popFront()
+  {
+    if(endOfLineOffset >= dataLength) {
+
+      if(this.line is null) {
+	//writefln("[DEBUG] LineReader.popFront no more data");
+	return;
+      }
+      this.dataLength = this.chunker.read(reader);
+      if(this.dataLength == 0) {
+	this.line = null;
+	//writefln("[DEBUG] LineReader.popFront no more data");
+	return;
+      }
+      endOfLineOffset = 0;
+    }
+
+    auto startOfNextLine = endOfLineOffset;
+    while(true) {
+      if(chunker.buffer[endOfLineOffset] == '\n') {
+	endOfLineOffset++;
+	line = chunker.buffer[startOfNextLine..endOfLineOffset];
+	break;
+      }
+      endOfLineOffset++;
+      if(endOfLineOffset >= dataLength) {
+	line = chunker.buffer[startOfNextLine..endOfLineOffset];
+	break;
+      }
+    }
+
+    //writefln("[DEBUG] LineReader.popFront '%s'", escape(line));
+
+  }
+}
+
+
+auto byLine(CharReader reader, char[] buffer, BufferTooSmall tooSmall) {
+  return LineReader(reader, buffer, tooSmall);
+}
+/*
+auto byLine(File file, char[] buffer, BufferTooSmall tooSmall) {
+  auto fileCharReader = FileCharReader(file);
+  return LinesReader(&(fileCharReader.read), buffer, tooSmall);
+}
+*/
+
+version(unittest_common) unittest
+{
+  mixin(scopedTest!("LineReader"));
+
+  char[256] buffer256;
+
+  void testLines(string data, size_t testLine = __LINE__) {
+    CustomChunks customChunks;
+	
+    for(auto chunkSize = 1; chunkSize <= data.length; chunkSize++) {
+
+      // Create Chunks
+      string[] chunks;
+      size_t offset;
+      for(offset = 0; offset + chunkSize <= data.length; offset += chunkSize) {
+	chunks ~= data[offset .. offset + chunkSize];
+      }
+      if(data.length - offset > 0) {
+	chunks ~= data[offset .. $];
+      }
+      //writefln("ChunkSize %s Chunks %s", chunkSize, chunks);
+
+      customChunks = CustomChunks(chunks);
+      auto lineReader = LineReader(&(customChunks.read), buffer256, BufferTooSmall.throwException);
+
+      //writefln("[DEBUG] lineReader.front = '%s'", lineReader.front);
+      
+      
+      size_t lineNumber = 1;
+      foreach(line; data.byLine()) {
+	//writefln("[DEBUG] line %s '%s'", lineNumber, escape(line));
+
+	if(lineReader.empty) {
+	  writefln("Expected line '%s' but no more lines", escape(line));
+	  assert(0);
+	}
+	if(line != lineReader.front) {
+	  writefln("Expected: '%s'", escape(line));
+	  writefln("Actual  : '%s'", escape(lineReader.front));
+	  assert(0);
+	}
+	lineReader.popFront;
+	lineNumber++;
+      }
+
+      if(!lineReader.empty) {
+	writefln("Got extra line '%s' but expected no more lines", escape(lineReader.front));
+	assert(0);
+      }
+
+    }
+  }
+
+  //testLines("abc");
+  //testLines("abc\n");
+  testLines("abc\n1234\n\n");
+
+
 }
