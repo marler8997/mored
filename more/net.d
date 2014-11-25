@@ -20,8 +20,6 @@ interface ISocketConnector
 //alias void delegate(Socket socket, Address address) SocketConnector;
 
 
-
-
 /// examples:
 ///    http:<ip-or-host>:<port>
 ///    socks5:<ip-or-host>:<port>
@@ -43,9 +41,9 @@ ISocketConnector parseProxy(string proxyString)
   if(proxyTypeString == "socks4") {
     throw new Exception("Not implemented");
   } else if(proxyTypeString == "socks5") {
-    return new Proxy5Connector(parseAddress(ipOrHostString, port));
+    return new Proxy5Connector(addressFromIPOrHost(ipOrHostString, port));
   } else {
-    throw new Exception("Unknown proxy type");
+    throw new Exception(format("Unknown proxy type '%s'", proxyTypeString));
   }
 }
 string parseConnector(string connectorString, out ISocketConnector connector)

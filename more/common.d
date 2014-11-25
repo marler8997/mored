@@ -582,7 +582,7 @@ struct ArrayList(V)
   }
   public void removeAt(size_t index)
   {
-    for(uint i = index; i < count - 1; i++) {
+    for(auto i = index; i < count - 1; i++) {
       array[index] = array[index + 1];
     }
     count--;
