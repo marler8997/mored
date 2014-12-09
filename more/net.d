@@ -12,6 +12,28 @@ import core.thread;
 
 import more.common;
 
+/**
+   The maximum number of ascii characters of a domain name.
+   Note: includes delimiting dots but not a trailing dot.
+*/
+enum MAX_DOMAIN_NAME_ASCII_CHARS = 253;
+/**
+   The maximum number of a domain label, which is the string in between
+   the dots in a domain name.
+ */
+enum MAX_DOMAIN_LABEL_ASCII_CHARS = 63;
+
+string tryRemoteAddressString(Socket sock)
+{
+  Address addr;
+  try {
+    addr = sock.remoteAddress();
+  } catch(Exception e) {
+    return "(unknown address)";
+  }
+  return addr.toString();
+}
+
 interface ISocketConnector
 {
   void connect(Socket socket, Address address);
@@ -59,6 +81,19 @@ string parseConnector(string connectorString, out ISocketConnector connector)
   }
 }
 
+Address addressFromIPOrHostAndPort(const(char)[] ipOrHostAndPort)
+{
+  ptrdiff_t colonIndex = indexOf(ipOrHostAndPort, ':');
+
+  if(colonIndex == -1)
+    throw new Exception(format("ipOrHost '%s' is missing a colon to indicate the port", ipOrHostAndPort));
+
+  auto ipOrHost = ipOrHostAndPort[0..colonIndex];
+  auto port = to!ushort(ipOrHostAndPort[colonIndex+1..$]);
+
+  return addressFromIPOrHost(ipOrHost, port);
+}
+
 Address addressFromIPOrHostAndOptionalPort(string ipOrHostAndOptionalPort, ushort defaultPort)
 {
   ptrdiff_t colonIndex = indexOf(ipOrHostAndOptionalPort, ':');
@@ -76,7 +111,7 @@ Address addressFromIPOrHostAndOptionalPort(string ipOrHostAndOptionalPort, ushor
 
   return addressFromIPOrHost(ipOrHost, port);
 }
-Address addressFromIPOrHost(string ipOrHost, ushort port)
+auto addressFromIPOrHost(const(char)[] ipOrHost, ushort port)
 {
 /+
   debug writefln("Parsing Address '%s' (port=%s)", ipOrHost, port);
@@ -242,7 +277,7 @@ struct TcpSocketPair {
 alias void delegate(ISocketSelector selector, Socket socket) SocketHandler;
 
 // Called with null if the socket was closed
-alias void delegate(ISocketSelector selector, Socket socket, ubyte[] data) DataSocketHandler;
+alias void delegate(ISocketSelector selector, ref DataSocketAndHandler handler, ubyte[] data) DataSocketHandler;
 
 
 interface ISocketSelector
@@ -256,6 +291,7 @@ struct SocketAndHandler
   public Socket socket;
   public SocketHandler handler;
 }
+
 struct DataSocketAndHandler
 {
   public Socket socket;
@@ -266,10 +302,10 @@ struct DataSocketAndHandler
 /// This is so the select loops will not be messed up.
 class SimpleSelector : Thread, ISocketSelector
 {
-  const uint bufferSize;
+  const size_t bufferSize;
   ArrayList!SocketAndHandler handlers;
   ArrayList!DataSocketAndHandler dataHandlers;
-  public this(T)(uint bufferSize, T initialHandlers)
+  public this(T)(size_t bufferSize, T initialHandlers)
   {
     super(&run);
     this.bufferSize = bufferSize;
@@ -290,12 +326,12 @@ class SimpleSelector : Thread, ISocketSelector
   {
     DataSocketAndHandler s = DataSocketAndHandler(socket, handler);
     dataHandlers.put(s);
-    debug{writefln("Added DataSocket '%s' (%s total data sockets)", socket.remoteAddress(), dataHandlers.count); stdout.flush();}
+    debug{writefln("Added DataSocket '%s' (%s total data sockets)", socket.tryRemoteAddressString(), dataHandlers.count); stdout.flush();}
   }
   void run()
   {
-    //ubyte[] buffer = new ubyte[bufferSize];
-    ubyte[] buffer = (cast(ubyte*)alloca(bufferSize))[0..bufferSize];
+    ubyte[] buffer = new ubyte[bufferSize];
+    //ubyte[] buffer = (cast(ubyte*)alloca(bufferSize))[0..bufferSize];
 
     SocketSet selectSockets = new SocketSet();
     ptrdiff_t bytesRead;
@@ -303,6 +339,7 @@ class SimpleSelector : Thread, ISocketSelector
 
   SELECT_LOOP_START:
     while(true) {
+      selectSockets.reset();
       foreach(i; 0..handlers.count) {
 	selectSockets.add(handlers.array[i].socket);
       }
@@ -325,17 +362,23 @@ class SimpleSelector : Thread, ISocketSelector
       }
       // Handle data sockets
       for(size_t i = 0; i < dataHandlers.count; i++) {
-	DataSocketAndHandler dataHandler = dataHandlers.array[i];
-	if(selectSockets.isSet(dataHandler.socket)) {
-	  bytesRead = dataHandler.socket.receive(buffer);
+	auto socket = dataHandlers.array[i].socket;
+	if(selectSockets.isSet(socket)) {
+	  bytesRead = socket.receive(buffer);
 	  if(bytesRead <= 0) {
-	    dataHandler.handler(this, dataHandler.socket, null);
+	    dataHandlers.array[i].handler(this, dataHandlers.array[i], null);
 	    dataHandlers.removeAt(i);
 	    i--;
-	    debug{writefln("Removed DataSocket '%s' (%s data sockets left)", dataHandler.socket.remoteAddress(), dataHandlers.count);stdout.flush();}
+	    debug{writefln("Removed DataSocket '%s' (%s data sockets left)", socket.tryRemoteAddressString(), dataHandlers.count);stdout.flush();}
 	  } else {
 	    debug{writefln("Received %s bytes", bytesRead);stdout.flush();}
-	    dataHandler.handler(this, dataHandler.socket, buffer[0..bytesRead]);
+	    dataHandlers.array[i].handler(this, dataHandlers.array[i], buffer[0..bytesRead]);
+	    if(dataHandlers.array[i].handler is null) {
+	      try { socket.shutdown(SocketShutdown.BOTH); } catch { }
+	      try { socket.close(); } catch { }
+	      dataHandlers.removeAt(i);
+	      i--;
+	    }
 	  }
 	  socketsAffected--;
 	  if(socketsAffected == 0) goto SELECT_LOOP_START;

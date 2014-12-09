@@ -915,7 +915,6 @@ struct FormattedBinaryWriter
 
   ubyte[] columnBuffer;
 
-
   string offsetFormat;
   mixin(bitfields!
 	(bool, "hex", 1,
@@ -1008,11 +1007,19 @@ struct FormattedBinaryWriter
 
       sink("\n");
       offset += columnBuffer.length;
+
+      cachedData = 0;
     }
   }
-  void put(scope ubyte[] data) {
+  void put(scope ubyte[] data) in { assert(data.length); } body {
     if(cachedData > 0) {
-      implement();
+      auto combineLength = columnBuffer.length - cachedData;
+      if(combineLength > data.length) {
+	combineLength = data.length;
+      }
+      columnBuffer[cachedData..cachedData+combineLength] = data[];
+      writeRow(columnBuffer);
+      data = data[combineLength..$];
     }
 
     while(data.length >= columnBuffer.length) {
