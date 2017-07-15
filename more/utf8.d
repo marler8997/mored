@@ -1,14 +1,14 @@
 module more.utf8;
 
-
-version(unittest_utf8) {
-  import std.stdio;
-  import more.common;
+version(unittest_utf8)
+{
+    import std.stdio;
+    import more.common;
 }
 
 version(unittest_utf8)
 {
-  import std.string;
+    import std.string;
 }
 
 //
@@ -18,61 +18,72 @@ private enum genericMessage = "invalid utf8";
 private enum startedInsideCodePointMessage = "utf8 string started inside a utf8 code point";
 private enum missingBytesMessage = "utf8 encoding is missing some bytes";
 private enum outOfRangeMessage = "the utf8 code point is out of range";
-class Utf8Exception : Exception {
-  enum Type {
-    generic,
-    startedInsideCodePoint,
-    missingBytes,
-    outOfRange,
-  }
-  static string getMessage(Type type) {
-    final switch(type) {
-    case Type.generic: return genericMessage;
-    case Type.startedInsideCodePoint: return startedInsideCodePointMessage;
-    case Type.missingBytes: return missingBytesMessage;
-    case Type.outOfRange: return outOfRangeMessage;
+class Utf8Exception : Exception
+{
+    enum Type
+    {
+        generic,
+        startedInsideCodePoint,
+        missingBytes,
+        outOfRange,
     }
-  }
-  const Type type;
-  this(Type type) {
-    super(getMessage(type));
-    this.type = type;
-  }
+    static string getMessage(Type type)
+    {
+        final switch(type)
+        {
+          case Type.generic: return genericMessage;
+          case Type.startedInsideCodePoint: return startedInsideCodePointMessage;
+          case Type.missingBytes: return missingBytesMessage;
+          case Type.outOfRange: return outOfRangeMessage;
+        }
+    }
+    const Type type;
+    this(Type type)
+    {
+        super(getMessage(type));
+        this.type = type;
+    }
 }
 
 
 // This method assumes that utf8 points to at least one character
 // and that the first non-valid pointer is at the limit pointer
 // (this means that utf8 < limit)
-dchar decodeUtf8(ref inout(char)* utf8, const char* limit) {
-  dchar c = *utf8;
-  utf8++;
-  if(c <= 0x7F) {
-    return c;
-  }
-  if((c & 0x40) == 0) {
-    throw new Utf8Exception(Utf8Exception.Type.startedInsideCodePoint);
-  }
-
-  if((c & 0x20) == 0) {
-    if(utf8 >= limit) throw new Utf8Exception(Utf8Exception.Type.missingBytes);
-    return ((c << 6) & 0x7C0) | (*(utf8++) & 0x3F);
-  }
-
-  if((c & 0x10) == 0) {
+dchar decodeUtf8(ref inout(char)* utf8, const char* limit)
+{
+    dchar c = *utf8;
     utf8++;
-    if(utf8 >= limit) throw new Utf8Exception(Utf8Exception.Type.missingBytes);
-    return ((c << 12) & 0xF000) | ((*(utf8 - 1) << 6) & 0xFC0) | (*(utf8++) & 0x3F);
-  }
-  
-  if((c & 0x08) == 0) {
-    utf8 += 2;
-    if(utf8 >= limit) throw new Utf8Exception(Utf8Exception.Type.missingBytes);
-    return ((c << 18) & 0x1C0000) | ((*(utf8 - 2) << 12) & 0x3F000) |
-      ((*(utf8 - 1) << 6) & 0xFC0) | (*(utf8++) & 0x3F);
-  }
+    if(c <= 0x7F)
+    {
+        return c;
+    }
+    if((c & 0x40) == 0)
+    {
+        throw new Utf8Exception(Utf8Exception.Type.startedInsideCodePoint);
+    }
 
-  throw new Utf8Exception(Utf8Exception.Type.outOfRange);
+    if((c & 0x20) == 0)
+    {
+        if(utf8 >= limit) throw new Utf8Exception(Utf8Exception.Type.missingBytes);
+        return ((c << 6) & 0x7C0) | (*(utf8++) & 0x3F);
+    }
+
+    if((c & 0x10) == 0)
+    {
+        utf8++;
+        if(utf8 >= limit) throw new Utf8Exception(Utf8Exception.Type.missingBytes);
+        return ((c << 12) & 0xF000) | ((*(utf8 - 1) << 6) & 0xFC0) | (*(utf8++) & 0x3F);
+    }
+
+    if((c & 0x08) == 0)
+    {
+        utf8 += 2;
+        if(utf8 >= limit) throw new Utf8Exception(Utf8Exception.Type.missingBytes);
+        return ((c << 18) & 0x1C0000) | ((*(utf8 - 2) << 12) & 0x3F000) |
+            ((*(utf8 - 1) << 6) & 0xFC0) | (*(utf8++) & 0x3F);
+    }
+
+    throw new Utf8Exception(Utf8Exception.Type.outOfRange);
 }
 
 //
