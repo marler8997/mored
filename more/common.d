@@ -10,7 +10,7 @@ import std.format;
 
 import core.exception;
 
-import std.c.string : memmove;
+import core.stdc.string : memmove;
 
 version(unittest)
 {
@@ -795,6 +795,54 @@ version(unittest_common) unittest
   assert("\\n" == escape("\n"));
   assert("\\\\" == escape("\\"));
 }
+char hexchar(ubyte b) in { assert(b <= 0x0F); } body
+{
+    return cast(char)(b + ((b <= 9) ? '0' : ('A'-10)));
+}
+
+struct Escaped
+{
+    const(char)* str;
+    const char* limit;
+    this(const(char)[] str)
+    {
+        this.str = str.ptr;
+        this.limit = str.ptr + str.length;
+    }
+    void toString(scope void delegate(const(char)[]) sink) const
+    {
+        const(char) *print = str;
+        const(char) *ptr = str;
+      CHUNK_LOOP:
+        for(;ptr < limit;ptr++)
+        {
+            char c = *ptr;
+            if(c < ' ' || c > '~') // if not human readable
+            {
+                if(ptr > print)
+                {
+                    sink(print[0..ptr-print]);
+                }
+                if(c == '\r') sink("\\r");
+                else if(c == '\t') sink("\\t");
+                else if(c == '\n') sink("\\n");
+                else {
+                    char[4] buffer;
+                    buffer[0] = '\\';
+                    buffer[1] = 'x';
+                    buffer[2] = hexchar(c>>4);
+                    buffer[3] = hexchar(c&0xF);
+                    sink(buffer);
+                }
+                print = ptr + 1;
+            }
+        }
+        if(ptr > print)
+        {
+            sink(print[0..ptr-print]);
+        }
+    }
+}
 
 
 struct StdoutWriter
@@ -911,7 +959,7 @@ struct AsciiBufferedInput
 
 struct FormattedBinaryWriter
 {
-  scope void delegate(const(char)[]) sink;
+  void delegate(const(char)[]) sink;
 
   ubyte[] columnBuffer;
 

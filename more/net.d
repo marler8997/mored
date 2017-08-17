@@ -27,15 +27,20 @@ version(Windows)
         WSAGetLastError,
         WSAOVERLAPPED, LPWSAOVERLAPPED_COMPLETION_ROUTINE,
         //WSAIoctl,
-        //getnameinfo, getaddrinfo, freeaddrinfo,
+
+        // DNS
+        AI_NUMERICHOST,
+        addrinfo, /*getnameinfo, getaddrinfo, freeaddrinfo,*/
+
         //closesocket, shutdown, bind, listen, ioctlsocket,
         //connect, send, sendto, recv, recvfrom, socklen_t, accept,
         //sockaddr, sockaddr_in, sockaddr_in6,
         //getsockopt, setsockopt,
         //ntohs, ntohl, htons, htonl,
         //tcp_keepalive,
-        FIONBIO;
+        FIONBIO,
         //fd_set, FD_SETSIZE, FD_ISSET,
+        timeval;
         //SOL_SOCKET,
         //SO_DEBUG, SO_BROADCAST, SO_REUSEADDR, SO_LINGER, SO_OOBINLINE, SO_SNDBUF,
         //SO_RCVBUF, SO_DONTROUTE, SO_SNDTIMEO, SO_RCVTIMEO, SO_ERROR, SO_KEEPALIVE,
@@ -92,8 +97,8 @@ enum Protocol : int
 
 version(Windows)
 {
-    alias _ctimeval = core.sys.windows.winsock2.timeval;
-    alias _clinger = core.sys.windows.winsock2.linger;
+    //alias _ctimeval = core.sys.windows.winsock2.timeval;
+    //alias _clinger = core.sys.windows.winsock2.linger;
 
     import std.windows.syserror : sysErrorString, GetModuleHandleA, GetProcAddress;
 
@@ -123,8 +128,26 @@ version(Windows)
     }
 
     private extern(Windows) socket_t socket(int af, SocketType type, Protocol protocol) nothrow @nogc;
-    extern(Windows) sysresult_t bind(socket_t sock, sockaddr* addr, uint addrlen);
+
+    enum SD_RECEIVE = 0;
+    enum SD_SEND    = 1;
+    enum SD_BOTH    = 2;
+    enum Shutdown
+    {
+      recv = SD_RECEIVE,
+      send = SD_SEND,
+      both = SD_BOTH,
+    }
+    extern(Windows) sysresult_t shutdown(socket_t sock, Shutdown how);
+    extern(Windows) int closesocket(socket_t);
+
+    extern(Windows) sysresult_t bind(socket_t sock, const(sockaddr)* addr, uint addrlen);
+    extern(Windows) sysresult_t connect(socket_t sock, const(sockaddr)* addr, uint addrlen);
+
     extern(Windows) sysresult_t listen(socket_t sock, uint backlog);
+
+    extern(Windows) socket_t WSAAccept(socket_t sock, sockaddr* addr, uint* addrlen, void*, void*);
+    extern(Windows) socket_t accept(socket_t sock, sockaddr* addr, socklen_t* addrlen);
 
     extern(Windows) sysresult_t getsockname(socket_t sock, sockaddr* addr, uint* namelen);
 
@@ -134,7 +157,31 @@ version(Windows)
         void* outBuffer, uint outBufferLength,
         uint* bytesReturned, WSAOVERLAPPED* overlapped, LPWSAOVERLAPPED_COMPLETION_ROUTINE completionRoutine);
 
-    extern(Windows) socket_t WSAAccept(socket_t sock, sockaddr* addr, uint* addrlen, void*, void*);
+    extern(Windows) int recv(socket_t sock, ubyte* buffer, uint len, uint flags);
+    extern(Windows) int send(socket_t sock, const(ubyte)* buffer, uint len, uint flags);
+
+    extern(Windows) int recvfrom(socket_t sock, ubyte* buffer, uint len, uint flags, sockaddr* from, uint* fromlen);
+    extern(Windows) int sendto(socket_t sock, const(ubyte)* buffer, uint len, uint flags, const(sockaddr)* to, uint tolen);
+
+    struct fd_set
+    {
+        uint fd_count;
+        socket_t[0] fd_array;
+    }
+    struct fd_set_storage(size_t size)
+    {
+        uint fd_count;
+        socket_t[size] fd_array;
+        @property fd_set* ptr()
+        {
+            return cast(fd_set*)&this;
+        }
+        void addNoCheck(socket_t sock)
+        {
+            fd_array[fd_count++] = sock;
+        }
+    }
+    extern(Windows) int select(int ignore, fd_set* readfds, fd_set* writefds, fd_set* exceptfds, timeval* timeout);
 
     socket_t createsocket(AddressFamily family, SocketType type, Protocol protocol)
     {
@@ -180,6 +227,8 @@ version(Windows)
         assert(functionPointer, "WSAIoctl SIO_GET_EXTENSION_FUNCTION_POINTER returned success but function pointer is null");
         return functionPointer;
     }
+
+
 }
 else version(Posix)
 {
@@ -243,9 +292,9 @@ else version(Posix)
     {
       close(sock);
     }
-    extern(C) sysresult_t bind(socket_t sock, sockaddr* addr, uint addrlen);
+    extern(C) sysresult_t bind(T)(socket_t sock, const(sockaddr)* addr, uint addrlen);
     extern(C) sysresult_t listen(socket_t sock, uint backlog);
-    extern(C) socket_t accept(socket_t sock,  sockaddr* addr, socklen_t* addrlen);
+    extern(C) socket_t accept(socket_t sock,  const(sockaddr)* addr, socklen_t* addrlen);
     extern(C) ptrdiff_t recv(socket_t sock, ubyte* buffer, size_t len, uint flags);
     extern(C) ptrdiff_t send(socket_t sock, ubyte* buffer, size_t len, uint flags);
     extern(C) sysresult_t getpeername(socket_t sock, sockaddr* addr, socklen_t* addrlen);
@@ -257,6 +306,9 @@ else
     static assert(0, "unhandled platform");
 }
 
+private immutable typeof(&core.sys.windows.winsock2.getnameinfo) getnameinfoPointer;
+private immutable typeof(&core.sys.windows.winsock2.getaddrinfo) getaddrinfoPointer;
+private immutable typeof(&core.sys.windows.winsock2.freeaddrinfo) freeaddrinfoPointer;
 
 shared static this() @system
 {
@@ -271,28 +323,19 @@ shared static this() @system
         // Load method extensions
 
 
-
-
         // These functions may not be present on older Windows versions.
         // See the comment in InternetAddress.toHostNameString() for details.
         auto ws2Lib = GetModuleHandleA("ws2_32.dll");
-        assert(ws2Lib, format("GetModuleHandleA(\"ws2_32.dll\") failed error=%s", WSAGetLastError()));
-
-        /*
-        getnameinfoPointer = cast(typeof(getnameinfoPointer))
-                             GetProcAddress(ws2Lib, "getnameinfo");
-        getaddrinfoPointer = cast(typeof(getaddrinfoPointer))
-                             GetProcAddress(ws2Lib, "getaddrinfo");
-        if(getaddrinfoPointer)
+        //assert(ws2Lib, format("GetModuleHandleA(\"ws2_32.dll\") failed error=%s", WSAGetLastError()));
+        if (ws2Lib)
         {
+            getnameinfoPointer = cast(typeof(getnameinfoPointer))
+                                 GetProcAddress(ws2Lib, "getnameinfo");
+            getaddrinfoPointer = cast(typeof(getaddrinfoPointer))
+                                 GetProcAddress(ws2Lib, "getaddrinfo");
             freeaddrinfoPointer = cast(typeof(freeaddrinfoPointer))
                                  GetProcAddress(ws2Lib, "freeaddrinfo");
-            if(!freeaddrinfoPointer)
-            {
-                getaddrinfoPointer = null;
-            }
         }
-        */
     }
     else version(Posix)
     {
@@ -301,6 +344,14 @@ shared static this() @system
         getaddrinfoPointer = &getaddrinfo;
         freeaddrinfoPointer = &freeaddrinfo;
         */
+    }
+}
+
+shared static ~this() @system nothrow @nogc
+{
+    version(Windows)
+    {
+        WSACleanup();
     }
 }
 
@@ -316,6 +367,11 @@ T htons(T)(T value) if(T.sizeof == 2)
     auto result = nativeToBigEndian(value);
     return *(cast(T*)&result);
 }
+ushort htons(ushort value)
+{
+    auto result = nativeToBigEndian(value);
+    return *(cast(ushort*)&result);
+}
 T ntohl(T)(T value) if(T.sizeof == 4)
 {
     auto result = nativeToBigEndian(value);
@@ -326,8 +382,6 @@ T htonl(T)(T value) if(T.sizeof == 4)
     auto result = nativeToBigEndian(value);
     return *(cast(T*)&result);
 }
-
-
 
 
 struct in_addr
@@ -341,10 +395,24 @@ struct in6_addr
     ubyte[16] s6_addr;
 }
 
+union inet_addr
+{
+    in_addr ipv4;
+    in6_addr ipv6;
+}
+
+
 struct sockaddr
 {
     AddressFamily sa_family;
     char[14] sa_data;
+    /*
+    static void assign(sockaddr* dst, sockaddr* src)
+    {
+        auto size = sockaddrsize(src.sa_family);
+        (cast(ubyte*)dst)[0..size] == (cast(ubyte*)src)[0..size];
+    }
+    */
 }
 struct sockaddr_in
 {
@@ -378,13 +446,13 @@ union inet_sockaddr
     sockaddr     sa;
     sockaddr_in  ipv4;
     sockaddr_in6 ipv6;
-    this(in_port_t sin_port, in_addr sin_addr)
+    this(const in_port_t sin_port, in_addr sin_addr)
     {
         ipv4.sin_family = AddressFamily.inet;
         ipv4.sin_port   = sin_port;
         ipv4.sin_addr   = sin_addr;
     }
-    this(in_port_t sin6_port, in6_addr sin6_addr)
+    this(const in_port_t sin6_port, in6_addr sin6_addr)
     {
         ipv4.sin_family = AddressFamily.inet6;
         ipv6.sin6_port   = sin6_port;
@@ -392,20 +460,29 @@ union inet_sockaddr
     }
     void toString(scope void delegate(const(char)[]) sink) const
     {
-        if(family == AddressFamily.inet) {
-          auto addr = ntohl(ipv4.sin_addr.s_addr);
-          formattedWrite(sink, "%s.%s.%s.%s:%s",
-                         (addr >> 24),
-                         (addr >> 16) & 0xFF,
-                         (addr >>  8) & 0xFF,
-                         (addr >>  0) & 0xFF,
-                         ntohs(in_port));
-        } else if(family == AddressFamily.inet6) {
-          char[INET6_ADDRSTRLEN] str;
-          assert(inet_ntop(AddressFamily.inet6, &ipv6.sin6_addr, str.ptr, str.length),
-            format("inet_ntop failed (e=%s)", lastError()));
-	  formattedWrite(sink, "[%s]:%s", str.ptr[0..core.stdc.string.strlen(str.ptr)],
-			 ntohs(in_port));
+        if(family == AddressFamily.inet)
+        {
+            auto addr = ntohl(ipv4.sin_addr.s_addr);
+            formattedWrite(sink, "%s.%s.%s.%s:%s",
+                          (addr >> 24),
+                          (addr >> 16) & 0xFF,
+                          (addr >>  8) & 0xFF,
+                          (addr >>  0) & 0xFF,
+                          ntohs(in_port));
+        }
+        else if(family == AddressFamily.inet6)
+        {
+            char[INET6_ADDRSTRLEN] str;
+            version(Windows)
+            {
+                assert(0, "inet_sockaddr ipv6 toString not implemented");
+            }
+            else
+            {
+                assert(inet_ntop(AddressFamily.inet6, &ipv6.sin6_addr, str.ptr, str.length),
+                    format("inet_ntop failed (e=%s)", lastError()));
+            }
+            formattedWrite(sink, "[%s]:%s", str.ptr[0..core.stdc.string.strlen(str.ptr)], ntohs(in_port));
         } else {
           formattedWrite(sink, "<unknown_family:%s>", family);
         }
@@ -424,6 +501,63 @@ union inet_sockaddr
     }
 }
 
+
+pragma(inline)
+sysresult_t bind(T)(socket_t sock, const(T)* addr)
+    if( is(T == inet_sockaddr) /* add more types */ )
+{
+    return bind(sock, cast(sockaddr*)addr, T.sizeof);
+}
+pragma(inline)
+sysresult_t connect(T)(socket_t sock, const(T)* addr)
+    if( is(T == inet_sockaddr) /* add more types */ )
+{
+    return connect(sock, cast(sockaddr*)addr, T.sizeof);
+}
+pragma(inline)
+socket_t accept(T)(socket_t sock, T* addr)
+    if( is(T == inet_sockaddr) /* add more types */ )
+{
+    socklen_t fromlen = T.sizeof;
+    return accept(sock, cast(sockaddr*)addr, &fromlen);
+}
+pragma(inline)
+auto send(T)(socket_t sock, const(T)* buffer, uint len, uint flags = 0)
+    if(T.sizeof == 1 && !is(T == ubyte))
+{
+    return send(sock, cast(const(ubyte)*)buffer, len, flags);
+}
+pragma(inline)
+auto send(T)(socket_t sock, const(T)[] buffer, uint flags = 0)
+    if(T.sizeof == 1)
+{
+    return send(sock, cast(const(ubyte)*)buffer, buffer.length, flags);
+}
+pragma(inline)
+auto recv(T)(socket_t sock, T* buffer, uint len, uint flags = 0)
+    if(T.sizeof == 1 && !is(T == ubyte))
+{
+    return recv(sock, cast(ubyte*)buffer, len, flags);
+}
+pragma(inline)
+auto recv(T)(socket_t sock, T[] buffer, uint flags = 0)
+    if(T.sizeof == 1)
+{
+    return recv(sock, cast(ubyte*)buffer.ptr, buffer.length, flags);
+}
+pragma(inline)
+auto recvfrom(T,U)(socket_t sock, T[] buffer, uint flags, U* from)
+    if(T.sizeof == 1 && is(U == inet_sockaddr) /* add more types */ )
+{
+    uint fromlen = U.sizeof;
+    return recvfrom(sock, cast(ubyte*)buffer.ptr, buffer.length, flags, cast(sockaddr*)from, &fromlen);
+}
+pragma(inline)
+auto sendto(T,U)(socket_t sock, const(T)[] buffer, uint flags, const(U)* from)
+    if(T.sizeof == 1 && is(U == inet_sockaddr) /* add more types */ )
+{
+    return sendto(sock, cast(const(ubyte)*)buffer.ptr, buffer.length, flags, cast(const(sockaddr)*)from, U.sizeof);
+}
 
 alias Blocking = Flag!"blocking";
 sysresult_t setMode(socket_t sock, Blocking blocking)
