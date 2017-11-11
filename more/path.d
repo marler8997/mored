@@ -184,7 +184,7 @@ char[] normalizePath(bool useSlashes)(char[] path) @safe pure nothrow @nogc
     3. replaces 'path/..' strings with 'path'
     4. replaces all slashes/backslashes with the dirSeparator
     5. removed trailing slashes if not a root directory
-  This function modifies the given string 
+  This function modifies the given string
   Returns: The length of the normalized path
  */
 size_t normalizePathLength(bool useSlashes)(char[] path) @safe pure nothrow @nogc
@@ -209,7 +209,7 @@ size_t normalizePathLength(bool useSlashes)(char[] path) @safe pure nothrow @nog
     auto c = path[i];
 
     if(c == dirSeparator) {
-      
+
     }
 
   }
@@ -220,7 +220,7 @@ size_t normalizePathLength(bool useSlashes)(char[] path) @safe pure nothrow @nog
 version(unittest_path) unittest
 {
   mixin(scopedTest!("normalizePath function"));
-  
+
   void testNormalizePath(bool useSlashes)(string testString, string expected, size_t testLine = __LINE__)
   {
     auto normalized = cast(char*)alloca(testString.length);
@@ -458,15 +458,15 @@ void appendPath(char* output, const(char[]) path)
 void buildPath(char* output, string[] segments...)
 {
     if (segments.empty) return null;
-    
+
     size_t first;
     foreach(i, segment; segments) {
       if(!segment.empty) {
-	first = i;
-	goto BUILD;
+        first = i;
+        goto BUILD;
       }
     }
-    
+
     return;
 
  BUILD:
@@ -476,21 +476,21 @@ void buildPath(char* output, string[] segments...)
     foreach (segment; segments[first+1..$]) {
         if (segment.empty) continue;
 /+
-	if (isRooted(segment)) {
-	  version (Posix) {
-	    pos = 0;
-	  } else version (Windows) {
-	      if (isAbsolute(segment)) {
-		pos = 0; 
-	      } else {
-		pos = rootName(buf[0 .. pos]).length;
-		if (pos > 0 && isDirSeparator(buf[pos-1])) --pos;
-	      }
-	    }
-	}
+        if (isRooted(segment)) {
+          version (Posix) {
+            pos = 0;
+          } else version (Windows) {
+              if (isAbsolute(segment)) {
+                pos = 0;
+              } else {
+                pos = rootName(buf[0 .. pos]).length;
+                if (pos > 0 && isDirSeparator(buf[pos-1])) --pos;
+              }
+            }
+        }
 +/
-	if (!isDirSeparator(output[pos-1])) {
-	  output[pos++] = dirSeparator[0];
+        if (!isDirSeparator(output[pos-1])) {
+          output[pos++] = dirSeparator[0];
         }
         output[pos .. pos + segment.length] = segment[];
         pos += segment.length;

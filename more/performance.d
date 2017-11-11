@@ -45,15 +45,15 @@ void TestRun(tests...)(string name, uint runs, uint iterations)
     foreach(testIndex, test; tests) {
       static if(testIndex % 2 == 1) {
 
-	long before = Clock.currStdTime();
-	foreach(iteration; 0..iterations) {
-	  mixin(test);
-	}
-	float runTime = stdTimeMillis(Clock.currStdTime() - before);
-	if(printIndividualTestRuns) {
-	  logTime(run, tests[testIndex-1] , runTime);
-	}
-	times[testIndex / 2] += runTime;
+        long before = Clock.currStdTime();
+        foreach(iteration; 0..iterations) {
+          mixin(test);
+        }
+        float runTime = stdTimeMillis(Clock.currStdTime() - before);
+        if(printIndividualTestRuns) {
+          logTime(run, tests[testIndex-1] , runTime);
+        }
+        times[testIndex / 2] += runTime;
       }
     }
 
@@ -162,52 +162,52 @@ void main(string[] args)
   enum runCount = 2;
 
   TestRun!(
-	   "Clock.currStdTime()"   , "long time = Clock.currStdTime();",
-	   "Clock.currSystemTick()", "TickDuration d = Clock.currSystemTick();",
-	   "Clock.currAppTick()"   , "TickDuration d = Clock.currAppTick();",
-	   "Clock.currTime()"      , "SysTime time = Clock.currTime();"
-	   )("FastestClockFunction", runCount, 1000000);
+           "Clock.currStdTime()"   , "long time = Clock.currStdTime();",
+           "Clock.currSystemTick()", "TickDuration d = Clock.currSystemTick();",
+           "Clock.currAppTick()"   , "TickDuration d = Clock.currAppTick();",
+           "Clock.currTime()"      , "SysTime time = Clock.currTime();"
+           )("FastestClockFunction", runCount, 1000000);
 
   TestRun!(
-	   "StructInitializer"   , "ABCStruct s = {a:1,b:2,c:3};",
-	   "StructConstructor"   , "ABCStructConstructor s = ABCStructConstructor(1,2,3);"
-	   )("Struct Initializer vs Constructor", runCount, 10000000);
+           "StructInitializer"   , "ABCStruct s = {a:1,b:2,c:3};",
+           "StructConstructor"   , "ABCStructConstructor s = ABCStructConstructor(1,2,3);"
+           )("Struct Initializer vs Constructor", runCount, 10000000);
 
   TestRun!(
-	   "StructReference"       , "ModifyByReference(abcStruct);",
-	   "StructPointer"         , "ModifyByPointer(&abcStruct);",
-	   "StructPointerAndReturn", "ModifyByPointerAndReturn(&abcStruct);"
-	   )("Struct ref vs pointer", runCount, 10000000);
+           "StructReference"       , "ModifyByReference(abcStruct);",
+           "StructPointer"         , "ModifyByPointer(&abcStruct);",
+           "StructPointerAndReturn", "ModifyByPointerAndReturn(&abcStruct);"
+           )("Struct ref vs pointer", runCount, 10000000);
 
   TestRun!(
-	   "ArrayLoopOffset"       , "string str = testStringA; size_t off = 0; while(true) { if(off >= str.length) break; off++; }",
-	   "ArrayLoopSlice"        , "string str = testStringA;while(true) { if(str.length <= 0) break; str = str[1..$];}"
-	   )("Array Offset vs Slice", runCount, 10000000);
+           "ArrayLoopOffset"       , "string str = testStringA; size_t off = 0; while(true) { if(off >= str.length) break; off++; }",
+           "ArrayLoopSlice"        , "string str = testStringA;while(true) { if(str.length <= 0) break; str = str[1..$];}"
+           )("Array Offset vs Slice", runCount, 10000000);
 
   TestRun!(
-	   "MarlerUtf8Decode"       , "string str = testStringA; auto start = str.ptr; decodeUtf8(start, str.ptr + str.length);",
-	   "BjoernUtf8Decode"       , "string str = testStringA; auto start = str.ptr; bjoernDecodeUtf8(start, str.ptr + str.length);"
-	   )("Marler vs Bjoern Utf8 Decode", runCount, 1000000);
+           "MarlerUtf8Decode"       , "string str = testStringA; auto start = str.ptr; decodeUtf8(start, str.ptr + str.length);",
+           "BjoernUtf8Decode"       , "string str = testStringA; auto start = str.ptr; bjoernDecodeUtf8(start, str.ptr + str.length);"
+           )("Marler vs Bjoern Utf8 Decode", runCount, 1000000);
 
   TestRun!(
-	   "Algebraic"       , "ABCDStruct* s = algebraicStruct.peek!ABCDStruct();if(s != null) s.a = 3;",
-	   "Enum"            , "ABCDEnumStruct * s = (abcdEnumStruct.type == ABCType.ABCD) ? &abcdEnumStruct : null;s.a = 3;"
-	   )("Albebraic vs Enum", runCount, 1000000);
+           "Algebraic"       , "ABCDStruct* s = algebraicStruct.peek!ABCDStruct();if(s != null) s.a = 3;",
+           "Enum"            , "ABCDEnumStruct * s = (abcdEnumStruct.type == ABCType.ABCD) ? &abcdEnumStruct : null;s.a = 3;"
+           )("Albebraic vs Enum", runCount, 1000000);
 
 
   TestRun!(
-	   "And"              , "b = (letterAdchar & 0x80) == 0;",
-	   "LessThan"         , "b = (letterAdchar < 0x7F);",
-	   )("And vs LessThan", runCount, 10000000);
+           "And"              , "b = (letterAdchar & 0x80) == 0;",
+           "LessThan"         , "b = (letterAdchar < 0x7F);",
+           )("And vs LessThan", runCount, 10000000);
 
 
 
   version(sdl) {
 
     TestRun!(
-	     "sdlang_"         , "sdlang_.ast.Tag tag; tag = sdlang_.parser.parseSource(testSdlString);",
-	     "more.sdl"        , "more.sdl.Tag tag; char[] sdl = cast(char[])testSdlString; while(more.sdl.parseSdlTag(&tag, &sdl)) { }"
-	     )("sdlang_ vs more.sdl", runCount, 10000);
+             "sdlang_"         , "sdlang_.ast.Tag tag; tag = sdlang_.parser.parseSource(testSdlString);",
+             "more.sdl"        , "more.sdl.Tag tag; char[] sdl = cast(char[])testSdlString; while(more.sdl.parseSdlTag(&tag, &sdl)) { }"
+             )("sdlang_ vs more.sdl", runCount, 10000);
 
   }
 }

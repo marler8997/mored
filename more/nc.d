@@ -52,28 +52,28 @@ int main(string[] args)
     bufferSize = 2048;
 
     getopt(args,
-	   "o|local-host", &localHostString,
-	   "p|port", &localPort,
-	   "l|listen", &listenMode,
-	   "b|buffer-size", &bufferSize);
+           "o|local-host", &localHostString,
+           "p|port", &localPort,
+           "l|listen", &listenMode,
+           "b|buffer-size", &bufferSize);
 
     if(listenMode) {
 
       if(args.length != 1) {
-	writeln("Listen-Mode expects 0 command line arguments but gut %s",
-		args.length - 1);
-	return 1;
+        writeln("Listen-Mode expects 0 command line arguments but gut %s",
+                args.length - 1);
+        return 1;
       }
 
       Address localAddress;
       if(localHostString is null) {
-	localAddress = new InternetAddress(InternetAddress.ADDR_ANY, localPort);
+        localAddress = new InternetAddress(InternetAddress.ADDR_ANY, localPort);
       } else {
-	throw new Exception("local host string not implemented");
+        throw new Exception("local host string not implemented");
       } 
 
       auto listenSocket = new Socket(localAddress.addressFamily(),
-				     SocketType.STREAM, ProtocolType.TCP);
+                                     SocketType.STREAM, ProtocolType.TCP);
 
       listenSocket.bind(localAddress);
       listenSocket.listen(1);
@@ -83,9 +83,9 @@ int main(string[] args)
     } else {
 
       if(args.length != 3) {
-	writeln("Connect-Mode expects 2 command line arguments but gut %s",
-		args.length - 1);
-	return 1;
+        writeln("Connect-Mode expects 2 command line arguments but gut %s",
+                args.length - 1);
+        return 1;
       }
 
       string connectorString = args[1];
@@ -98,9 +98,9 @@ int main(string[] args)
       globalSocket = new Socket(address.addressFamily(), SocketType.STREAM, ProtocolType.TCP);
 
       if(localHostString !is null || localPort != 0) {
-	writeln("localhost and localport aren't implemented yet");
-	//globalSocket.bind(new InternetAddress(InternetAddress.ADDR_ANY, localPort));
-	return 1;
+        writeln("localhost and localport aren't implemented yet");
+        //globalSocket.bind(new InternetAddress(InternetAddress.ADDR_ANY, localPort));
+        return 1;
       }
 
       // Connect
@@ -138,39 +138,39 @@ version(Posix) {
 
       while(true) {
 
-	FD_SET(STDIN_FILENO, &readSockets);
-	FD_SET(sock, &readSockets);
+        FD_SET(STDIN_FILENO, &readSockets);
+        FD_SET(sock, &readSockets);
 
-	debug writefln("[DEBUG] select");
-	if(select(maxFD, &readSockets, null, null, null) < 0)
-	  throw new ErrnoException("select failed");
+        debug writefln("[DEBUG] select");
+        if(select(maxFD, &readSockets, null, null, null) < 0)
+          throw new ErrnoException("select failed");
 
-	if(FD_ISSET(STDIN_FILENO, &readSockets)) {
+        if(FD_ISSET(STDIN_FILENO, &readSockets)) {
 
-	  auto readLength = read(STDIN_FILENO, cast(void*)buffer, bufferLength);
-	  if(readLength <= 0) {
-	    errnoContext = "read of stdin failed";
-	    break;
-	  }
+          auto readLength = read(STDIN_FILENO, cast(void*)buffer, bufferLength);
+          if(readLength <= 0) {
+            errnoContext = "read of stdin failed";
+            break;
+          }
       
-	  debug writefln("[DEBUG] stdin read %s bytes", readLength);
-	  send(sock, cast(void*)buffer, readLength, 0);
+          debug writefln("[DEBUG] stdin read %s bytes", readLength);
+          send(sock, cast(void*)buffer, readLength, 0);
       
-	}
-	if(FD_ISSET(sock, &readSockets)) {
-	  auto recvLength = recv(sock, cast(void*)buffer, bufferLength, 0);
-	  debug writefln("[DEBUG] recvLength %s", recvLength);
-	  if(recvLength <= 0) {
-	    errnoContext = "recv failed";
-	    if(recvLength == 0)
-	      sock = -1;
-	    break;
-	  }
+        }
+        if(FD_ISSET(sock, &readSockets)) {
+          auto recvLength = recv(sock, cast(void*)buffer, bufferLength, 0);
+          debug writefln("[DEBUG] recvLength %s", recvLength);
+          if(recvLength <= 0) {
+            errnoContext = "recv failed";
+            if(recvLength == 0)
+              sock = -1;
+            break;
+          }
 
-	  debug writefln("[DEBUG] socket read %s bytes", recvLength);
-	  write(STDOUT_FILENO, cast(void*)buffer, recvLength);
+          debug writefln("[DEBUG] socket read %s bytes", recvLength);
+          write(STDOUT_FILENO, cast(void*)buffer, recvLength);
 
-	}
+        }
       }
     }
 
@@ -235,8 +235,8 @@ version(Posix) {
       size_t bytesRead = fread(buffer.ptr, 1, bufferSize, core.stdc.stdio.stdin);
 
       if(bytesRead <= 0) {
-	debug {writefln("[DEBUG] stdin closed"); stdout.flush(); }
-	break;
+        debug {writefln("[DEBUG] stdin closed"); stdout.flush(); }
+        break;
       }
       debug {writefln("[DEBUG] stdin read %s bytes", bytesRead); stdout.flush(); }
       globalSocket.send(buffer[0..bytesRead]);
@@ -255,8 +255,8 @@ version(Posix) {
     while(true) {
       bytesRead = globalSocket.receive(buffer);
       if(bytesRead <= 0) {
-	debug {writefln("[DEBUG] socket closed by remote host"); stdout.flush(); }
-	break;
+        debug {writefln("[DEBUG] socket closed by remote host"); stdout.flush(); }
+        break;
       }
       debug {writefln("[DEBUG] socket read %s bytes", bytesRead); stdout.flush(); }
       write(cast(char[])buffer[0..bytesRead]);

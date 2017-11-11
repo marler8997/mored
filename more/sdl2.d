@@ -354,65 +354,65 @@ struct SdlParser
       // TODO: maybe use a lookup table here
       if(c == ' ' || c == '\t' || c =='\v' || c == '\f' || c == '\r') {
 
-	// do nothing (check first as this is the most likely case)
+        // do nothing (check first as this is the most likely case)
 
       } else if(c == '\n') {
 
-	line++;
-	column = 0;
+        line++;
+        column = 0;
 
       } else if(c == '#') {
 
-	toNextLine();
+        toNextLine();
 
       } else if(c == '-' || c == '/') {
 
-	if(next >= limit) return;
+        if(next >= limit) return;
 
-	dchar secondChar = decodeUtf8(next, limit);
-	
-	if(secondChar == c) { // '--' or '//'
+        dchar secondChar = decodeUtf8(next, limit);
 
-	  toNextLine();
+        if(secondChar == c) { // '--' or '//'
 
-	} else if(secondChar == '*') {
-	  
-	  column++;
+          toNextLine();
 
-	MULTILINE_COMMENT_LOOP:
-	  while(next < limit) {
+        } else if(secondChar == '*') {
 
-	    c = decodeUtf8(next, limit); // no need to save cpos since c will be thrown away
-	    column++;
+          column++;
 
-	    if(c == '\n') {
-	      line++;
-	      column = 0;
-	      line++;
-	    } else if(c == '*') {
-	      // loop assume c is pointing to a '*' and next is pointing to the next characer
-	      while(next < limit) {
+        MULTILINE_COMMENT_LOOP:
+          while(next < limit) {
 
-		c = decodeUtf8(next, limit);
-		column++;
-		if(c == '/') break MULTILINE_COMMENT_LOOP;
-		if(c == '\n') {
-		  line++;
-		  column = 0;
-		} else if(c != '*') {
-		  break;
-		}
-	      }
-	    }
-	  }
+            c = decodeUtf8(next, limit); // no need to save cpos since c will be thrown away
+            column++;
 
-	} else {
-	  return;
-	}
+            if(c == '\n') {
+              line++;
+              column = 0;
+              line++;
+            } else if(c == '*') {
+              // loop assume c is pointing to a '*' and next is pointing to the next characer
+              while(next < limit) {
+
+                c = decodeUtf8(next, limit);
+                column++;
+                if(c == '/') break MULTILINE_COMMENT_LOOP;
+                if(c == '\n') {
+                  line++;
+                  column = 0;
+                } else if(c != '*') {
+                  break;
+                }
+              }
+            }
+          }
+
+        } else {
+          return;
+        }
 
       } else {
 
-	return; // Found non-whitespace and non-comment
+        return; // Found non-whitespace and non-comment
 
       }
 
@@ -451,9 +451,9 @@ struct SdlParser
 /+
     void determineTokenType() {
       if(token.namespace is null && isSdlKeyword(token.text)) {
-	token.type = SdlTokenType.value;	  
+        token.type = SdlTokenType.value;
       } else {
-	token.type = SdlTokenType.tagName;
+        token.type = SdlTokenType.tagName;
       }
     }
 +/
@@ -467,29 +467,29 @@ struct SdlParser
     if(isIDStart(c)) {
 
       while(true) {
-	//writefln("[DEBUG] tryParseToken cpos %s to %s", cpos, next);
-	cpos = next;
-	if(cpos >= limit) break;
-	c = decodeUtf8(next, limit);
-	if(!isID(c)) break;
+        //writefln("[DEBUG] tryParseToken cpos %s to %s", cpos, next);
+        cpos = next;
+        if(cpos >= limit) break;
+        c = decodeUtf8(next, limit);
+        if(!isID(c)) break;
       }
 
       token.text = start[0..cpos-start];
       if(parseState == ParseState.startOfTag && !isSdlKeyword(token.text)) {
-	token.type = SdlTokenType.tagName;
+        token.type = SdlTokenType.tagName;
       } else {
-	token.type = SdlTokenType.value;	  
+        token.type = SdlTokenType.value;
       }
 
       if(cpos >= limit) return;
       if(c != ':' && !isValidAfterTagItem(c))
-	throw new SdlParseException(SdlErrorType.invalidCharacterAfterTagItem, token,
-				    format("a %s cannot be immediately followed by '%s'", token.type, escape(c)));
+        throw new SdlParseException(SdlErrorType.invalidCharacterAfterTagItem, token,
+                                    format("a %s cannot be immediately followed by '%s'", token.type, escape(c)));
 
       lineBeforeSkip = line;
       skipWhitespaceAndComments();
       if(line != lineBeforeSkip || cpos >= limit) {
-	return;
+        return;
       }
     } else {
       token.text = null;
@@ -501,23 +501,23 @@ struct SdlParser
 
       cpos = next;
       if(cpos >= limit)
-	throw new SdlParseException(SdlErrorType.invalidCharacterAfterColon, token, eofAfterColonMsg);
+        throw new SdlParseException(SdlErrorType.invalidCharacterAfterColon, token, eofAfterColonMsg);
       c = decodeUtf8(next, limit);
 
       lineBeforeSkip = line;
       skipWhitespaceAndComments();
       if(line != lineBeforeSkip)
-	throw new SdlParseException(SdlErrorType.invalidCharacterAfterColon, token, newlineAfterColonMsg);
+        throw new SdlParseException(SdlErrorType.invalidCharacterAfterColon, token, newlineAfterColonMsg);
 
       start = cpos;
       if(!isIDStart(c)) throw new SdlParseException(SdlErrorType.invalidCharacterAfterColon, token,
-						    format("expected "~idStartUserString~" after namespace colon ':' but got '%s'", c));
+                                                    format("expected "~idStartUserString~" after namespace colon ':' but got '%s'", c));
 
       while(true) {
-	cpos = next;
-	if(cpos >= limit) break;
-	c = decodeUtf8(next, limit);
-	if(!isID(c)) break;
+        cpos = next;
+        if(cpos >= limit) break;
+        c = decodeUtf8(next, limit);
+        if(!isID(c)) break;
       }
 
       token.text = start[0..cpos-start];
@@ -528,55 +528,55 @@ struct SdlParser
       //
       lineBeforeSkip = line;
       if(cpos < limit) {
-	skipWhitespaceAndComments();
+        skipWhitespaceAndComments();
       }
       if(cpos >= limit || line != lineBeforeSkip) {
-	if(parseState == ParseState.startOfTag) {
-	  token.type = SdlTokenType.tagName;
-	  return;
-	}
-	throw new SdlParseException(SdlErrorType.attributeMissingValue, token, "attribute missing '=' value");
+        if(parseState == ParseState.startOfTag) {
+          token.type = SdlTokenType.tagName;
+          return;
+        }
+        throw new SdlParseException(SdlErrorType.attributeMissingValue, token, "attribute missing '=' value");
       }
 
-      
+
 /+
 
       if(parseState == ParseState.startOfTag) {
 
-	(token.namespace !is null || !isSdlKeyword(token.text))) {
-	token.type = SdlTokenType.tagName;
+        (token.namespace !is null || !isSdlKeyword(token.text))) {
+        token.type = SdlTokenType.tagName;
       } else {
-	token.type = SdlTokenType.value;	  
+        token.type = SdlTokenType.value;
       }
 +/
       if(parseState == ParseState.startOfTag) {
-	if(cpos < limit && !isValidAfterTagItem(c))
-	  throw new SdlParseException(SdlErrorType.invalidCharacterAfterTagItem, token,
-				      format("a %s cannot be immediately followed by '%s'", token.type, escape(c)));
-	return;
+        if(cpos < limit && !isValidAfterTagItem(c))
+          throw new SdlParseException(SdlErrorType.invalidCharacterAfterTagItem, token,
+                                      format("a %s cannot be immediately followed by '%s'", token.type, escape(c)));
+        return;
       }
 
       lineBeforeSkip = line;
       skipWhitespaceAndComments();
       if(line != lineBeforeSkip || cpos >= limit)
-	throw new SdlParseException(SdlErrorType.attributeMissingValue, token, "attribute missing '=' value");
+        throw new SdlParseException(SdlErrorType.attributeMissingValue, token, "attribute missing '=' value");
     }
-    
+
     // Handle Attributes and Unquoted Strings
     if(token.text !is null) {
       if(parseState == ParseState.startOfTag) return;
 
       if(c != '=') {
-	if(token.namespace !is null)
-	  throw new SdlParseException(SdlErrorType.valueCannotHaveNamespace, token, "a tag value cannot have a namespace");
+        if(token.namespace !is null)
+          throw new SdlParseException(SdlErrorType.valueCannotHaveNamespace, token, "a tag value cannot have a namespace");
 
-	token.type = SdlTokenType.value;
-	if(!allowUnquotedStrings) {
-	  if(!isSdlKeyword(token.text))
-	    throw new SdlParseException(SdlErrorType.unquotedStringsNotAllowed, token, "unquoted strings are now allowed '%s'");
-	}
-	if(!isValidAfterTagItem(c)) throw new SdlParseException(SdlErrorType.invalidCharacterAfterTagItem, token, format("an unquoted string cannot be immediately followed by '%s'", escape(c)));
-	return;
+        token.type = SdlTokenType.value;
+        if(!allowUnquotedStrings) {
+          if(!isSdlKeyword(token.text))
+            throw new SdlParseException(SdlErrorType.unquotedStringsNotAllowed, token, "unquoted strings are now allowed '%s'");
+        }
+        if(!isValidAfterTagItem(c)) throw new SdlParseException(SdlErrorType.invalidCharacterAfterTagItem, token, format("an unquoted string cannot be immediately followed by '%s'", escape(c)));
+        return;
       }
 
       implement("attributes");
@@ -591,10 +591,10 @@ struct SdlParser
       token.type = SdlTokenType.attribute;
       start = cpos;
       while(true) {
-	cpos = next;
-	if(next >= limit) break;
-	c = decodeUtf8(next, limit);
-	if(!isID(c)) break;
+        cpos = next;
+        if(next >= limit) break;
+        c = decodeUtf8(next, limit);
+        if(!isID(c)) break;
       }
       token.text = start[0..cpos-start];
     }
@@ -613,56 +613,56 @@ struct SdlParser
       auto start = cpos;
 
       if(c != ':') {
-	while(true) {
-	  cpos = next;
-	  if(next >= limit) { token = start[0..next-start]; return; }
-	  c = decodeUtf8(next, limit);
-	  if(!isID()) break;
-	}
+        while(true) {
+          cpos = next;
+          if(next >= limit) { token = start[0..next-start]; return; }
+          c = decodeUtf8(next, limit);
+          if(!isID()) break;
+        }
       }
 
       // Handle Namespaces
       if(c == ':') {
 
-	tokenNamespace = start[0..next-start]; // include the colon so the calling function
+        tokenNamespace = start[0..next-start]; // include the colon so the calling function
                                                // can differentiate between the empty namespace
                                                // and no namespace
-	cpos = next;
-	if(next >= limit) { token.length = 0; return; }
-	c = decodeUtf8(next, limit);
+        cpos = next;
+        if(next >= limit) { token.length = 0; return; }
+        c = decodeUtf8(next, limit);
 
-	if(!isIDStart()) {
-	  if(atFirstToken) {
-	    if(!isValidAfterTagItem()) throw new SdlParseException
-					 (tag.line, format("Character '%s' cannot appear after the tag's namespace", c));
-	    return;
-	  }
-	  throw new SdlParseException(tag.line,
-				      format("expected alphanum or '_' after an attribute namespace colon, but got '%s'", c));
-	}
+        if(!isIDStart()) {
+          if(atFirstToken) {
+            if(!isValidAfterTagItem()) throw new SdlParseException
+                                         (tag.line, format("Character '%s' cannot appear after the tag's namespace", c));
+            return;
+          }
+          throw new SdlParseException(tag.line,
+                                      format("expected alphanum or '_' after an attribute namespace colon, but got '%s'", c));
+        }
 
-	start = cpos;
-	while(true) {
-	  cpos = next;
-	  if(next >= limit) { token = start[0..next-start]; return; }
-	  c = decodeUtf8(next, limit);
-	  if(!isID()) break;
-	}
-	
+        start = cpos;
+        while(true) {
+          cpos = next;
+          if(next >= limit) { token = start[0..next-start]; return; }
+          c = decodeUtf8(next, limit);
+          if(!isID()) break;
+        }
+
       }
 
       // Handle attributes
       if(c != '=') {
-	if(!isValidAfterTagItem()) throw new SdlParseException
-				     (tag.line, format("Character '%s' cannot appear after tag item", c));
-	token = start[0..next-start-1];
-	return;
+        if(!isValidAfterTagItem()) throw new SdlParseException
+                                     (tag.line, format("Character '%s' cannot appear after tag item", c));
+        token = start[0..next-start-1];
+        return;
       }
 
       // Setup to parse the value
       attributeName = start[0..next-start-1]; // subtract 1 for the '='
       if(next >= limit) throw new SdlParseException
-			  (tag.line, format("sdl cannot end with '=' character"));
+                          (tag.line, format("sdl cannot end with '=' character"));
       cpos = next;
       c = decodeUtf8(next, limit);
     }
@@ -674,14 +674,14 @@ struct SdlParser
       auto start = cpos;
 
       while(true) {
-	cpos = next;
-	if(next >= limit) { token = start[0..next-start]; return; }
-	c = decodeUtf8(next, limit);
-	if(!isID()) break;
+        cpos = next;
+        if(next >= limit) { token = start[0..next-start]; return; }
+        c = decodeUtf8(next, limit);
+        if(!isID()) break;
       }
 
       if(!isValidAfterTagItem()) throw new SdlParseException
-				   (tag.line, format("Character '%s' cannot appear after a tag item", c));
+                                   (tag.line, format("Character '%s' cannot appear after a tag item", c));
 
       token = start[0..next-start-1];
       return;
@@ -695,27 +695,27 @@ struct SdlParser
 
       while(true) {
 
-	if(next >= limit) throw new SdlParseException(tag.line, noEndingQuote);
-	c = decodeUtf8(next, limit); // no need to save cpos since c will be thrown away
-	if(c == '"') break;
-	if(c == '\\') {
-	  containsEscapes = true;
-	  if(next >= limit) throw new SdlParseException(tag.line, noEndingQuote);
-	  // NOTE TODO: remember to handle escaped newlines
-	  c = decodeUtf8(next, limit);
-	} else if(c == '\n') {
-	  throw new SdlParseException(tag.line, noEndingQuote);
-	}
+        if(next >= limit) throw new SdlParseException(tag.line, noEndingQuote);
+        c = decodeUtf8(next, limit); // no need to save cpos since c will be thrown away
+        if(c == '"') break;
+        if(c == '\\') {
+          containsEscapes = true;
+          if(next >= limit) throw new SdlParseException(tag.line, noEndingQuote);
+          // NOTE TODO: remember to handle escaped newlines
+          c = decodeUtf8(next, limit);
+        } else if(c == '\n') {
+          throw new SdlParseException(tag.line, noEndingQuote);
+        }
 
       }
 
       if(containsEscapes) {
 
-	/* do something differnt if immuable */
-	implement("escaped strings");
+        /* do something differnt if immuable */
+        implement("escaped strings");
 
       } else {
-	token = cpos[0..next - cpos];
+        token = cpos[0..next - cpos];
       }
 
       cpos = next;
@@ -730,13 +730,13 @@ struct SdlParser
       auto start = cpos;
 
       while(true) {
-	cpos = next;
-	if(next >= limit) { token = start[0..cpos-start]; break; }
-	c = decodeUtf8(next, limit);
-	if(!isNumber()) { token = start[0..cpos-start]; break; }
+        cpos = next;
+        if(next >= limit) { token = start[0..cpos-start]; break; }
+        c = decodeUtf8(next, limit);
+        if(!isNumber()) { token = start[0..cpos-start]; break; }
 
-	//if(tag.rejectTypedNumbers && isNumberPostfix())
-	//throw new SdlParseException(tag.line, "using this sdl mode, postfix characters indicating the type after a number are not allowed");
+        //if(tag.rejectTypedNumbers && isNumberPostfix())
+        //throw new SdlParseException(tag.line, "using this sdl mode, postfix characters indicating the type after a number are not allowed");
       }
 
     } else if(c == '\'') {
@@ -754,7 +754,7 @@ struct SdlParser
   }
 
   // ExpectedState:
-  //   c/cpos: points to the first character 
+  //   c/cpos: points to the first character
   void parseNext(ref SdlToken token)
   {
     skipWhitespaceAndComments();
@@ -767,23 +767,23 @@ struct SdlParser
 
       tryParseToken(token);
       if(token.type == SdlTokenType.unknown) {
-	throw new SdlParseException(SdlErrorType.invalidStartOfTag, token, format("expected start of tag but got '%s'", c));
+        throw new SdlParseException(SdlErrorType.invalidStartOfTag, token, format("expected start of tag but got '%s'", c));
       } else if(token.type == SdlTokenType.tagName) {
-	// It is important that this only applies when namespace is null.
-	// This will break colon escapes of keywords if this check is
-	// changed to empty.
-	if(token.namespace is null) { 
-	  if(isSdlKeyword(token.text)) {
-	    token.type = SdlTokenType.value;	  
-	  }
-	}
-	parseState = ParseState.beforeAttributes;
+        // It is important that this only applies when namespace is null.
+        // This will break colon escapes of keywords if this check is
+        // changed to empty.
+        if(token.namespace is null) {
+          if(isSdlKeyword(token.text)) {
+            token.type = SdlTokenType.value;
+          }
+        }
+        parseState = ParseState.beforeAttributes;
       } else if(token.type == SdlTokenType.attribute) {
-	if(!allowMixedValuesAndAttributes)
-	  throw new SdlParseException(SdlErrorType.invalidStartOfTag, token, "a tag cannot start with an attribute");
-	parseState = ParseState.afterAttributes;
+        if(!allowMixedValuesAndAttributes)
+          throw new SdlParseException(SdlErrorType.invalidStartOfTag, token, "a tag cannot start with an attribute");
+        parseState = ParseState.afterAttributes;
       } else {
-	parseState = ParseState.beforeAttributes;
+        parseState = ParseState.beforeAttributes;
       }
 
     } else {
@@ -792,17 +792,17 @@ struct SdlParser
 
       tryParseToken(token);
       if(token.type == SdlTokenType.unknown) {
-	if(c == '{') {
-	  implement();
-	} else if(c == '}') {
-	  implement();
-	} else if(c == ';') {
-	  implement();
-	} else {
-	  throw new SdlParseException(SdlErrorType.invalidStartOfTagItem, token, format("expected literal, '{', '}', or ';' but got '%s'", c));
-	}
+        if(c == '{') {
+          implement();
+        } else if(c == '}') {
+          implement();
+        } else if(c == ';') {
+          implement();
+        } else {
+          throw new SdlParseException(SdlErrorType.invalidStartOfTagItem, token, format("expected literal, '{', '}', or ';' but got '%s'", c));
+        }
       } else if(token.type == SdlTokenType.tagName) {
-	assert(0, "CodeBug: token cannot be tagName when inside a tag");
+        assert(0, "CodeBug: token cannot be tagName when inside a tag");
       }
 
 
@@ -829,9 +829,9 @@ version(unittest_sdl2)
 
     debug {
       static if(reparse) {
-	writefln("[TEST] testing sdl              '%s'", escapedSdlText);
+        writefln("[TEST] testing sdl              '%s'", escapedSdlText);
       } else {
-	writefln("[TEST] testing sdl (regenerated)'%s'", escapedSdlText);
+        writefln("[TEST] testing sdl (regenerated)'%s'", escapedSdlText);
       }
     }
 
@@ -841,49 +841,49 @@ version(unittest_sdl2)
 
       for(auto i = 0; i < expectedTokens.length; i++) {
 
-	parser.parseNext(token);
+        parser.parseNext(token);
 
-	if(token.type == SdlTokenType.eof) {
-	  writefln("Expected %s token(s) but only got %s", expectedTokens.length, i);
-	  writefln("Error: test on line %s", line);
-	}
+        if(token.type == SdlTokenType.eof) {
+          writefln("Expected %s token(s) but only got %s", expectedTokens.length, i);
+          writefln("Error: test on line %s", line);
+        }
 
-	/+
-	static if(reparse) {
-	  if(previousDepth != size_t.max) {
-	    while(previousDepth > parsedTag.depth) {
-	      buffer2Sink.put("}");
-	      previousDepth--;
-	    }
-	  }
-	}
-	+/
+        /+
+        static if(reparse) {
+          if(previousDepth != size_t.max) {
+            while(previousDepth > parsedTag.depth) {
+              buffer2Sink.put("}");
+              previousDepth--;
+            }
+          }
+        }
+        +/
 
-	auto expectedToken = expectedTokens[i];
-	if(token.type != expectedToken.type) {
-	  writefln("Error: expected token '%s' but got '%s'", expectedToken.type, token.type);
-	  writefln("Error: test on line %s", line);
-	  assert(0);
-	}
+        auto expectedToken = expectedTokens[i];
+        if(token.type != expectedToken.type) {
+          writefln("Error: expected token '%s' but got '%s'", expectedToken.type, token.type);
+          writefln("Error: test on line %s", line);
+          assert(0);
+        }
 
-	// put the tag into the buffer2 sink to reparse again after
-	/+
-	static if(reparse) {
-	  parsedTag.toSdl(&buffer2Sink);
-	  previousDepth = parsedTag.depth;
-	  if(parsedTag.hasOpenBrace) previousDepth++;
-	}
-	+/
+        // put the tag into the buffer2 sink to reparse again after
+        /+
+        static if(reparse) {
+          parsedTag.toSdl(&buffer2Sink);
+          previousDepth = parsedTag.depth;
+          if(parsedTag.hasOpenBrace) previousDepth++;
+        }
+        +/
       }
 
       parser.parseNext(token);
       if(token.type != SdlTokenType.eof) {
-	writefln("Expected %s token(s) but got at least one more (depth=%s, token_type='%s')",
-		 expectedTokens.length, parser.depth, token.type);
-	writefln("Error: test on line %s", line);
-	assert(0);
+        writefln("Expected %s token(s) but got at least one more (depth=%s, token_type='%s')",
+                 expectedTokens.length, parser.depth, token.type);
+        writefln("Error: test on line %s", line);
+        assert(0);
       }
-      
+
     } catch(SdlParseException e) {
       writefln("[TEST] this sdl threw an unexpected SdlParseException: '%s'", escape(sdlText));
       writeln(e);
@@ -898,15 +898,15 @@ version(unittest_sdl2)
 /+
     static if(reparse) {
       if(previousDepth != size_t.max) {
-	while(previousDepth > parsedTag.depth) {
-	  buffer2Sink.put("}");
-	  previousDepth--;
-	}
+        while(previousDepth > parsedTag.depth) {
+          buffer2Sink.put("}");
+          previousDepth--;
+        }
       }
 
       if(buffer2Sink.slice != sdlText &&
-	 (buffer2Sink.slice.length && buffer2Sink.slice[0..$-1] != sdlText)) {
-	testParseSdl!false(false, buffer2Sink.slice, expectedTags, line);
+         (buffer2Sink.slice.length && buffer2Sink.slice[0..$-1] != sdlText)) {
+        testParseSdl!false(false, buffer2Sink.slice, expectedTags, line);
       }
     }
 +/
@@ -922,7 +922,7 @@ version(unittest_sdl2)
 
     try {
       do {
-	parser.parseNext(token);
+        parser.parseNext(token);
       } while(token.type != SdlTokenType.eof);
 
       writefln("Error: invalid sdl was successfully parsed: %s", sdlText);
@@ -947,12 +947,12 @@ version(unittest_sdl2)
 }
 
 version(unittest_sdl2) unittest
-{  
+{
   mixin(scopedTest!"SdlWhiteBoxTests");
 
 
-  //string[] end = ["", "\n", 
-  
+  //string[] end = ["", "\n",
+
   string[] namespaces = ["", "n", "ns", "namespace"];
   string[] tagNames = ["a", "ab", "tag", "longertag"];
   string[] keywords = ["null", "true", "false", "on", "off"];
@@ -1004,13 +1004,13 @@ version(unittest_sdl2) unittest
 
     parser.allowUnquotedStrings = true;
     testParseSdl(false, tagName~" "~tagName,
-		 [SdlToken(SdlTokenType.tagName, tagName), SdlToken(SdlTokenType.value, tagName)]);
+                 [SdlToken(SdlTokenType.tagName, tagName), SdlToken(SdlTokenType.value, tagName)]);
     parser.allowUnquotedStrings = false;
     //testInvalidSdl(false, tagName~" "~tagName, SdlErrorType.unquotedStringsNotAllowed);
 
     foreach(keyword; keywords) {
       testParseSdl(false, tagName~" "~keyword,
-		   [SdlToken(SdlTokenType.tagName, tagName), SdlToken(SdlTokenType.value, keyword)]);
+                   [SdlToken(SdlTokenType.tagName, tagName), SdlToken(SdlTokenType.value, keyword)]);
     }
   }
 
@@ -1141,7 +1141,7 @@ struct Tag {
   // Used to accept/reject different types of SDL or cause parseSdlTag to
   // behave differently like preventing it from modifying the sdl text.
   private ubyte flags;
-  
+
   /// Normally SDL only allows a tag's attributes to appear after all it's values.
   /// This flag causes parseSdlTag to allow values/attributes to appear in any order, i.e.
   ///     $(D tag attr="my-value" "another-value" # would be valid)
@@ -1254,45 +1254,45 @@ struct Tag {
     this(const(char)[] name, const(char)[][] values...) {
       auto colonIndex = name.indexOf(':');
       if(colonIndex > -1) {
-	this.namespace = name[0..colonIndex];
-	this.name = name[colonIndex+1..$];
+        this.namespace = name[0..colonIndex];
+        this.name = name[colonIndex+1..$];
       } else {
-	this.namespace.length = 0;
-	this.name = name;
+        this.namespace.length = 0;
+        this.name = name;
       }
       foreach(value; values) {
 
-	const(char)[] attributeNamespace = "";
-	size_t equalIndex = size_t.max;
+        const(char)[] attributeNamespace = "";
+        size_t equalIndex = size_t.max;
 
-	// check if it is an attribute
-	if(value.length && isIDStart(value[0])) {
-	  size_t i = 1;
-	  while(true) {
-	    if(i >= value.length) break;
-	    auto c = value[i];
-	    if(!isID(value[i])) {
-	      if(c == ':') {
-		if(attributeNamespace.length) throw new Exception("contained 2 colons?");
-		attributeNamespace = value[0..i];
-		i++;
-		continue;
-	      }
-	      if(value[i] == '=') {
-		equalIndex = i;
-	      }
-	      break;
-	    }
-	    i++;
-	  }
-	}
+        // check if it is an attribute
+        if(value.length && isIDStart(value[0])) {
+          size_t i = 1;
+          while(true) {
+            if(i >= value.length) break;
+            auto c = value[i];
+            if(!isID(value[i])) {
+              if(c == ':') {
+                if(attributeNamespace.length) throw new Exception("contained 2 colons?");
+                attributeNamespace = value[0..i];
+                i++;
+                continue;
+              }
+              if(value[i] == '=') {
+                equalIndex = i;
+              }
+              break;
+            }
+            i++;
+          }
+        }
 
-	if(equalIndex == size_t.max) {
-	  this.values.put(value);
-	} else {
-	  Attribute a = {attributeNamespace, value[attributeNamespace.length..equalIndex], value[equalIndex+1..$]};
-	  this.attributes.put(a);
-	}
+        if(equalIndex == size_t.max) {
+          this.values.put(value);
+        } else {
+          Attribute a = {attributeNamespace, value[attributeNamespace.length..equalIndex], value[equalIndex+1..$]};
+          this.attributes.put(a);
+        }
 
       }
     }
@@ -1350,7 +1350,7 @@ struct Tag {
     if(namespace.length) {
       str ~= namespace;
       str ~= name;
-    } 
+    }
    if(!isAnonymous || (values.data.length == 0 && attributes.data.length == 0)) {
       str ~= name;
     }
@@ -1361,8 +1361,8 @@ struct Tag {
     foreach(attribute; attributes.data) {
       str ~= ' ';
       if(attribute.namespace.length) {
-	str ~= attribute.namespace;
-	str ~= ':';
+        str ~= attribute.namespace;
+        str ~= ':';
       }
       str ~= attribute.id;
       str ~= '=';
@@ -1387,7 +1387,7 @@ struct Tag {
     }
     if(!isAnonymous || (values.data.length == 0 && attributes.data.length == 0)) {
       if(namespace.length == 0 && isSdlKeyword(name)) {
-	sink.put(":"); // Escape tag names that are keywords
+        sink.put(":"); // Escape tag names that are keywords
       }
       sink.put(name);
     }
@@ -1398,8 +1398,8 @@ struct Tag {
     foreach(attribute; attributes.data) {
       sink.put(" ");
       if(attribute.namespace.length) {
-	sink.put(attribute.namespace);
-	sink.put(":");
+        sink.put(attribute.namespace);
+        sink.put(":");
       }
       sink.put(attribute.id);
       sink.put("=");
@@ -1427,8 +1427,8 @@ struct Tag {
   void getOneValue(T)(ref T value) {
     if(values.data.length != 1) {
       throw new SdlParseException
-	(line,format("tag '%s' %s 1 value but had %s",
-		     name, (values.data.length == 0) ? "must have at least" : "can only have", values.data.length));
+        (line,format("tag '%s' %s 1 value but had %s",
+                     name, (values.data.length == 0) ? "must have at least" : "can only have", values.data.length));
     }
 
     const(char)[] literal = values.data[0];
@@ -1440,7 +1440,7 @@ struct Tag {
 
     } else static if( isIntegral!T || isFloatingPoint!T ) {
 
-	//if( value != 0 ) throwIsDuplicate();
+        //if( value != 0 ) throwIsDuplicate();
 
     } else {
 
@@ -1463,10 +1463,10 @@ struct Tag {
 
     foreach(literal; values.data) {
       static if( isSomeString!T ) {
-	if(literal[0] != '"') throw new SdlParseException(line, format("tag '%s' must have exactly one string literal but had another literal type", name));
-	t[arrayOffset++] = literal[1..$-1]; // remove surrounding quotes
+        if(literal[0] != '"') throw new SdlParseException(line, format("tag '%s' must have exactly one string literal but had another literal type", name));
+        t[arrayOffset++] = literal[1..$-1]; // remove surrounding quotes
       } else {
-	assert(0, format("Cannot convert sdl literal to D '%s' type", typeid(T)));
+        assert(0, format("Cannot convert sdl literal to D '%s' type", typeid(T)));
       }
     }
   }
@@ -1576,7 +1576,7 @@ bool sdlLiteralToD(T)(const(char)[] literal, ref T t) {
     t =  to!T(literal);
 
   } else {
-      
+
     t = to!T(literal);
 
   }
@@ -1594,49 +1594,49 @@ enum ubyte sdlValidAfterTagItemFlag   = 0x08;
 
 version(use_lookup_tables) {
   mixin("private __gshared ubyte[256] sdlLookup = "~rangeInitializers
-	("'_'"    , "sdlIDFlag",
+        ("'_'"    , "sdlIDFlag",
 
-	 `'a'`    , "sdlIDFlag",
-	 `'b'`    , "sdlIDFlag | sdlNumberFlag | sdlNumberPostfixFlag",
-	 `'c'`    , "sdlIDFlag",
-	 `'d'`    , "sdlIDFlag | sdlNumberFlag | sdlNumberPostfixFlag",
-	 `'e'`    , "sdlIDFlag",
-	 `'f'`    , "sdlIDFlag | sdlNumberFlag | sdlNumberPostfixFlag",
-	 `'g'-'k'`, "sdlIDFlag",
-	 `'l'`    , "sdlIDFlag | sdlNumberFlag | sdlNumberPostfixFlag",
-	 `'m'-'z'`, "sdlIDFlag",
+         `'a'`    , "sdlIDFlag",
+         `'b'`    , "sdlIDFlag | sdlNumberFlag | sdlNumberPostfixFlag",
+         `'c'`    , "sdlIDFlag",
+         `'d'`    , "sdlIDFlag | sdlNumberFlag | sdlNumberPostfixFlag",
+         `'e'`    , "sdlIDFlag",
+         `'f'`    , "sdlIDFlag | sdlNumberFlag | sdlNumberPostfixFlag",
+         `'g'-'k'`, "sdlIDFlag",
+         `'l'`    , "sdlIDFlag | sdlNumberFlag | sdlNumberPostfixFlag",
+         `'m'-'z'`, "sdlIDFlag",
 
-	 `'A'`    , "sdlIDFlag",
-	 `'B'`    , "sdlIDFlag | sdlNumberFlag | sdlNumberPostfixFlag",
-	 `'C'`    , "sdlIDFlag",
-	 `'D'`    , "sdlIDFlag | sdlNumberFlag | sdlNumberPostfixFlag",
-	 `'E'`    , "sdlIDFlag",
-	 `'F'`    , "sdlIDFlag | sdlNumberFlag | sdlNumberPostfixFlag",
-	 `'G'-'K'`, "sdlIDFlag",
-	 `'L'`    , "sdlIDFlag | sdlNumberFlag | sdlNumberPostfixFlag",
-	 `'M'-'Z'`, "sdlIDFlag",
+         `'A'`    , "sdlIDFlag",
+         `'B'`    , "sdlIDFlag | sdlNumberFlag | sdlNumberPostfixFlag",
+         `'C'`    , "sdlIDFlag",
+         `'D'`    , "sdlIDFlag | sdlNumberFlag | sdlNumberPostfixFlag",
+         `'E'`    , "sdlIDFlag",
+         `'F'`    , "sdlIDFlag | sdlNumberFlag | sdlNumberPostfixFlag",
+         `'G'-'K'`, "sdlIDFlag",
+         `'L'`    , "sdlIDFlag | sdlNumberFlag | sdlNumberPostfixFlag",
+         `'M'-'Z'`, "sdlIDFlag",
 
-	 `'0'-'9'`, "sdlIDFlag | sdlNumberFlag",
-	 `'-'`    , "sdlIDFlag",
-	 `'.'`    , "sdlIDFlag | sdlNumberFlag",
-	 `'$'`    , "sdlIDFlag",
+         `'0'-'9'`, "sdlIDFlag | sdlNumberFlag",
+         `'-'`    , "sdlIDFlag",
+         `'.'`    , "sdlIDFlag | sdlNumberFlag",
+         `'$'`    , "sdlIDFlag",
 
-	 `' '`    , "sdlValidAfterTagItemFlag",
-	 `'\t'`   , "sdlValidAfterTagItemFlag",
-	 `'\n'`   , "sdlValidAfterTagItemFlag",
-	 `'\v'`   , "sdlValidAfterTagItemFlag",
-	 `'\f'`   , "sdlValidAfterTagItemFlag",
-	 `'\r'`   , "sdlValidAfterTagItemFlag",
+         `' '`    , "sdlValidAfterTagItemFlag",
+         `'\t'`   , "sdlValidAfterTagItemFlag",
+         `'\n'`   , "sdlValidAfterTagItemFlag",
+         `'\v'`   , "sdlValidAfterTagItemFlag",
+         `'\f'`   , "sdlValidAfterTagItemFlag",
+         `'\r'`   , "sdlValidAfterTagItemFlag",
 
-	 `'{'`    , "sdlValidAfterTagItemFlag",
-	 `'}'`    , "sdlValidAfterTagItemFlag",
-	 `';'`    , "sdlValidAfterTagItemFlag",
-	 `'\\'`    , "sdlValidAfterTagItemFlag",
-	 `'/'`    , "sdlValidAfterTagItemFlag",
-	 `'#'`    , "sdlValidAfterTagItemFlag",
+         `'{'`    , "sdlValidAfterTagItemFlag",
+         `'}'`    , "sdlValidAfterTagItemFlag",
+         `';'`    , "sdlValidAfterTagItemFlag",
+         `'\\'`    , "sdlValidAfterTagItemFlag",
+         `'/'`    , "sdlValidAfterTagItemFlag",
+         `'#'`    , "sdlValidAfterTagItemFlag",
 
 
-	 )~";");
+         )~";");
 }
 
 /// A convenience function to parse a single tag.
@@ -1767,7 +1767,7 @@ bool parseSdlTag(Tag* tag, char[]* sdlText)
     case 2: return startOfID[0..2] == "on";
     case 3: return startOfID[0..3] == "off";
     case 4: return startOfID[0..4] == "null" ||
-	           startOfID[0..4] == "true";
+                   startOfID[0..4] == "true";
     case 5: return startOfID[0..5] == "false";
     default: return false;
     }
@@ -1787,55 +1787,55 @@ bool parseSdlTag(Tag* tag, char[]* sdlText)
       // TODO: maybe use a lookup table here
       if(c == ' ' || c == '\t' || c =='\v' || c == '\f' || c == '\r') {
 
-	// do nothing (check first as this is the most likely case)
+        // do nothing (check first as this is the most likely case)
 
       } else if(c == '\n') {
 
-	tag.line++;
+        tag.line++;
 
       } else if(c == '#') {
 
-	toNextLine();
+        toNextLine();
 
       } else if(c == '-' || c == '/') {
 
-	if(next >= limit) return tag.line > lineBefore;
+        if(next >= limit) return tag.line > lineBefore;
 
-	dchar secondChar = decodeUtf8(next, limit);
+        dchar secondChar = decodeUtf8(next, limit);
 
-	if(secondChar == c) { // '--' or '//'
+        if(secondChar == c) { // '--' or '//'
 
-	  toNextLine();
+          toNextLine();
 
-	} else if(secondChar == '*') {
-	  
-	MULTILINE_COMMENT_LOOP:
-	  while(next < limit) {
+        } else if(secondChar == '*') {
 
-	    c = decodeUtf8(next, limit); // no need to save cpos since c will be thrown away
-	    if(c == '\n') {
-	      tag.line++;
-	    } else if(c == '*') {
-	      // loop assume c is pointing to a '*' and next is pointing to the next characer
-	      while(next < limit) {
+        MULTILINE_COMMENT_LOOP:
+          while(next < limit) {
 
-		c = decodeUtf8(next, limit);
-		if(c == '/') break MULTILINE_COMMENT_LOOP;
-		if(c == '\n') {
-		  tag.line++;
-		} else if(c != '*') {
-		  break;
-		}
-	      }
-	    }
-	  }
+            c = decodeUtf8(next, limit); // no need to save cpos since c will be thrown away
+            if(c == '\n') {
+              tag.line++;
+            } else if(c == '*') {
+              // loop assume c is pointing to a '*' and next is pointing to the next characer
+              while(next < limit) {
 
-	} else {
-	  return tag.line > lineBefore;
-	}
+                c = decodeUtf8(next, limit);
+                if(c == '/') break MULTILINE_COMMENT_LOOP;
+                if(c == '\n') {
+                  tag.line++;
+                } else if(c != '*') {
+                  break;
+                }
+              }
+            }
+          }
+
+        } else {
+          return tag.line > lineBefore;
+        }
 
       } else {
-	return tag.line > lineBefore;
+        return tag.line > lineBefore;
       }
 
       //
@@ -1870,56 +1870,56 @@ bool parseSdlTag(Tag* tag, char[]* sdlText)
       auto start = cpos;
 
       if(c != ':') {
-	while(true) {
-	  cpos = next;
-	  if(next >= limit) { token = start[0..next-start]; return; }
-	  c = decodeUtf8(next, limit);
-	  if(!isID()) break;
-	}
+        while(true) {
+          cpos = next;
+          if(next >= limit) { token = start[0..next-start]; return; }
+          c = decodeUtf8(next, limit);
+          if(!isID()) break;
+        }
       }
 
       // Handle Namespaces
       if(c == ':') {
 
-	tokenNamespace = start[0..next-start]; // include the colon so the calling function
+        tokenNamespace = start[0..next-start]; // include the colon so the calling function
                                                // can differentiate between the empty namespace
                                                // and no namespace
-	cpos = next;
-	if(next >= limit) { token.length = 0; return; }
-	c = decodeUtf8(next, limit);
+        cpos = next;
+        if(next >= limit) { token.length = 0; return; }
+        c = decodeUtf8(next, limit);
 
-	if(!isIDStart()) {
-	  if(atFirstToken) {
-	    if(!isValidAfterTagItem()) throw new SdlParseException
-					 (tag.line, format("Character '%s' cannot appear after the tag's namespace", c));
-	    return;
-	  }
-	  throw new SdlParseException(tag.line,
-				      format("expected alphanum or '_' after an attribute namespace colon, but got '%s'", c));
-	}
+        if(!isIDStart()) {
+          if(atFirstToken) {
+            if(!isValidAfterTagItem()) throw new SdlParseException
+                                         (tag.line, format("Character '%s' cannot appear after the tag's namespace", c));
+            return;
+          }
+          throw new SdlParseException(tag.line,
+                                      format("expected alphanum or '_' after an attribute namespace colon, but got '%s'", c));
+        }
 
-	start = cpos;
-	while(true) {
-	  cpos = next;
-	  if(next >= limit) { token = start[0..next-start]; return; }
-	  c = decodeUtf8(next, limit);
-	  if(!isID()) break;
-	}
-	
+        start = cpos;
+        while(true) {
+          cpos = next;
+          if(next >= limit) { token = start[0..next-start]; return; }
+          c = decodeUtf8(next, limit);
+          if(!isID()) break;
+        }
+
       }
 
       // Handle attributes
       if(c != '=') {
-	if(!isValidAfterTagItem()) throw new SdlParseException
-				     (tag.line, format("Character '%s' cannot appear after tag item", c));
-	token = start[0..next-start-1];
-	return;
+        if(!isValidAfterTagItem()) throw new SdlParseException
+                                     (tag.line, format("Character '%s' cannot appear after tag item", c));
+        token = start[0..next-start-1];
+        return;
       }
 
       // Setup to parse the value
       attributeName = start[0..next-start-1]; // subtract 1 for the '='
       if(next >= limit) throw new SdlParseException
-			  (tag.line, format("sdl cannot end with '=' character"));
+                          (tag.line, format("sdl cannot end with '=' character"));
       cpos = next;
       c = decodeUtf8(next, limit);
     }
@@ -1931,14 +1931,14 @@ bool parseSdlTag(Tag* tag, char[]* sdlText)
       auto start = cpos;
 
       while(true) {
-	cpos = next;
-	if(next >= limit) { token = start[0..next-start]; return; }
-	c = decodeUtf8(next, limit);
-	if(!isID()) break;
+        cpos = next;
+        if(next >= limit) { token = start[0..next-start]; return; }
+        c = decodeUtf8(next, limit);
+        if(!isID()) break;
       }
 
       if(!isValidAfterTagItem()) throw new SdlParseException
-				   (tag.line, format("Character '%s' cannot appear after a tag item", c));
+                                   (tag.line, format("Character '%s' cannot appear after a tag item", c));
 
       token = start[0..next-start-1];
       return;
@@ -1952,27 +1952,27 @@ bool parseSdlTag(Tag* tag, char[]* sdlText)
 
       while(true) {
 
-	if(next >= limit) throw new SdlParseException(tag.line, noEndingQuote);
-	c = decodeUtf8(next, limit); // no need to save cpos since c will be thrown away
-	if(c == '"') break;
-	if(c == '\\') {
-	  containsEscapes = true;
-	  if(next >= limit) throw new SdlParseException(tag.line, noEndingQuote);
-	  // NOTE TODO: remember to handle escaped newlines
-	  c = decodeUtf8(next, limit);
-	} else if(c == '\n') {
-	  throw new SdlParseException(tag.line, noEndingQuote);
-	}
+        if(next >= limit) throw new SdlParseException(tag.line, noEndingQuote);
+        c = decodeUtf8(next, limit); // no need to save cpos since c will be thrown away
+        if(c == '"') break;
+        if(c == '\\') {
+          containsEscapes = true;
+          if(next >= limit) throw new SdlParseException(tag.line, noEndingQuote);
+          // NOTE TODO: remember to handle escaped newlines
+          c = decodeUtf8(next, limit);
+        } else if(c == '\n') {
+          throw new SdlParseException(tag.line, noEndingQuote);
+        }
 
       }
 
       if(containsEscapes) {
 
-	/* do something differnt if immuable */
-	implement("escaped strings");
+        /* do something differnt if immuable */
+        implement("escaped strings");
 
       } else {
-	token = cpos[0..next - cpos];
+        token = cpos[0..next - cpos];
       }
 
       cpos = next;
@@ -1987,13 +1987,13 @@ bool parseSdlTag(Tag* tag, char[]* sdlText)
       auto start = cpos;
 
       while(true) {
-	cpos = next;
-	if(next >= limit) { token = start[0..cpos-start]; break; }
-	c = decodeUtf8(next, limit);
-	if(!isNumber()) { token = start[0..cpos-start]; break; }
+        cpos = next;
+        if(next >= limit) { token = start[0..cpos-start]; break; }
+        c = decodeUtf8(next, limit);
+        if(!isNumber()) { token = start[0..cpos-start]; break; }
 
-	//if(tag.rejectTypedNumbers && isNumberPostfix())
-	//throw new SdlParseException(tag.line, "using this sdl mode, postfix characters indicating the type after a number are not allowed");
+        //if(tag.rejectTypedNumbers && isNumberPostfix())
+        //throw new SdlParseException(tag.line, "using this sdl mode, postfix characters indicating the type after a number are not allowed");
       }
 
     } else if(c == '\'') {
@@ -2026,33 +2026,33 @@ bool parseSdlTag(Tag* tag, char[]* sdlText)
 
       if(attributeName.length) {
 
-	tag.setIsAnonymous();
+        tag.setIsAnonymous();
 
-	if(tokenNamespace.length) tokenNamespace = tokenNamespace[0..$-1]; // Remove ending ':' on namespace
-	Attribute attribute = {tokenNamespace, attributeName, token};
-	tag.attributes.put(attribute);
+        if(tokenNamespace.length) tokenNamespace = tokenNamespace[0..$-1]; // Remove ending ':' on namespace
+        Attribute attribute = {tokenNamespace, attributeName, token};
+        tag.attributes.put(attribute);
 
       } else {
 
-	if(tokenNamespace.length) {
-	  tag.namespace = tokenNamespace[0..$-1];
-	  if(token.length) {
-	    tag.name = token;
-	  } else {
-	    tag.setIsAnonymous();
-	    if(tag.namespace.length == 0)
-	      throw new SdlParseException(tag.line, "A tag cannot have an empty namespace and an empty name");
-	  }
-	} else {
+        if(tokenNamespace.length) {
+          tag.namespace = tokenNamespace[0..$-1];
+          if(token.length) {
+            tag.name = token;
+          } else {
+            tag.setIsAnonymous();
+            if(tag.namespace.length == 0)
+              throw new SdlParseException(tag.line, "A tag cannot have an empty namespace and an empty name");
+          }
+        } else {
 
-	  if(isSdlKeyword(token)) {
-	    tag.setIsAnonymous();
-	    tag.values.put(token);
-	  } else {
-	    tag.name = token;
-	  }
+          if(isSdlKeyword(token)) {
+            tag.setIsAnonymous();
+            tag.values.put(token);
+          } else {
+            tag.name = token;
+          }
 
-	}
+        }
 
       }
 
@@ -2097,20 +2097,20 @@ bool parseSdlTag(Tag* tag, char[]* sdlText)
       if(cpos >= limit) goto RETURN_TAG;
       if(foundNewline) {
 
-	// check if it is a curly brace to either print a useful error message
-	// or determine if the tag has children
-	if(c != '{') {
-	  next = cpos; // rewind so whatever character it is will
-	               // be parsed again on the next call
-	  goto RETURN_TAG;
-	}
-	if(tag.allowBraceAfterNewline) {
-	  tag.hasOpenBrace = true;
-	  goto RETURN_TAG;
-	}
+        // check if it is a curly brace to either print a useful error message
+        // or determine if the tag has children
+        if(c != '{') {
+          next = cpos; // rewind so whatever character it is will
+                       // be parsed again on the next call
+          goto RETURN_TAG;
+        }
+        if(tag.allowBraceAfterNewline) {
+          tag.hasOpenBrace = true;
+          goto RETURN_TAG;
+        }
 
-	throw new SdlParseException(SdlErrorType.braceAfterNewline, tag.line,
-				    format(invalidBraceFmt, tag.name));
+        throw new SdlParseException(SdlErrorType.braceAfterNewline, tag.line,
+                                    format(invalidBraceFmt, tag.name));
       }
 
       //
@@ -2124,26 +2124,26 @@ bool parseSdlTag(Tag* tag, char[]* sdlText)
       // Handle the '\' character to escape newlines
       //
       if(c == '\\') {
-	if(next >= limit) goto RETURN_TAG; // (check to make sure ending an sdl file with a backslash is ok)
-	c = decodeUtf8(next, limit);
+        if(next >= limit) goto RETURN_TAG; // (check to make sure ending an sdl file with a backslash is ok)
+        c = decodeUtf8(next, limit);
 
-	foundNewline = skipWhitespaceAndComments();
-	if(cpos >= limit) goto RETURN_TAG;
-	if(!foundNewline) throw new SdlParseException(tag.line, "only comments/whitespace can follow a backslash '\\'");
+        foundNewline = skipWhitespaceAndComments();
+        if(cpos >= limit) goto RETURN_TAG;
+        if(!foundNewline) throw new SdlParseException(tag.line, "only comments/whitespace can follow a backslash '\\'");
 
-	continue;
+        continue;
       }
 
       if(c == '{') {
-	tag.hasOpenBrace = true; // depth will be incremented at the next parse
-	goto RETURN_TAG;
+        tag.hasOpenBrace = true; // depth will be incremented at the next parse
+        goto RETURN_TAG;
       }
 
       if(c == '}') {
-	if(tag.depth == 0) throw new SdlParseException(tag.line, tooManyEndingBraces);
-	next = cpos; // rewind so the '}' will be seen on the next call and
-	             // the depth will change on the next call
-	goto RETURN_TAG;
+        if(tag.depth == 0) throw new SdlParseException(tag.line, tooManyEndingBraces);
+        next = cpos; // rewind so the '}' will be seen on the next call and
+                     // the depth will change on the next call
+        goto RETURN_TAG;
       }
 
       //
@@ -2154,32 +2154,32 @@ bool parseSdlTag(Tag* tag, char[]* sdlText)
       tryParseToken(false);
       if(token.length || tokenNamespace.length) {
 
-	if(attributeName.length > 0) {
-	  if(tokenNamespace.length) tokenNamespace = tokenNamespace[0..$-1]; // Remove ending ':' on namespace
-	  Attribute attribute = {tokenNamespace, attributeName, token};
-	  tag.attributes.put(attribute);
-	} else {
+        if(attributeName.length > 0) {
+          if(tokenNamespace.length) tokenNamespace = tokenNamespace[0..$-1]; // Remove ending ':' on namespace
+          Attribute attribute = {tokenNamespace, attributeName, token};
+          tag.attributes.put(attribute);
+        } else {
 
-	  if(tokenNamespace.length)
-	    throw new SdlParseException(tag.line, format("Found a tag value with a namespace '%s%s'?", tokenNamespace, token));
+          if(tokenNamespace.length)
+            throw new SdlParseException(tag.line, format("Found a tag value with a namespace '%s%s'?", tokenNamespace, token));
 
-	  if(tag.attributes.data.length) {
-	    if(!tag.allowMixedValuesAndAttributes)
-	      throw new SdlParseException(SdlErrorType.mixedValuesAndAttributes, tag.line,
-					  format(mixedValuesAndAttributesFmt, token, tag.name));
-	  }
+          if(tag.attributes.data.length) {
+            if(!tag.allowMixedValuesAndAttributes)
+              throw new SdlParseException(SdlErrorType.mixedValuesAndAttributes, tag.line,
+                                          format(mixedValuesAndAttributesFmt, token, tag.name));
+          }
 
-	  tag.values.put(token);
-	}
+          tag.values.put(token);
+        }
 
-	if(cpos >= limit) goto RETURN_TAG;
+        if(cpos >= limit) goto RETURN_TAG;
 
       } else {
 
-	if(attributeName.length > 0) throw new SdlParseException(tag.line, "expected sdl literal to follow attribute '=' but was not a literal");
+        if(attributeName.length > 0) throw new SdlParseException(tag.line, "expected sdl literal to follow attribute '=' but was not a literal");
 
-	if(c == '\0') throw new Exception("possible code bug: found null");
-	throw new Exception(format("Unhandled character '%s' (code=0x%x)", c, cast(uint)c));
+        if(c == '\0') throw new Exception("possible code bug: found null");
+        throw new Exception(format("Unhandled character '%s' (code=0x%x)", c, cast(uint)c));
 
       }
     }
@@ -2264,9 +2264,9 @@ version(unittest_sdl) unittest
 
     debug {
       static if(reparse) {
-	writefln("[TEST] testing sdl              '%s'", escapedSdlText);
+        writefln("[TEST] testing sdl              '%s'", escapedSdlText);
       } else {
-	writefln("[TEST] testing sdl (regenerated)'%s'", escapedSdlText);
+        writefln("[TEST] testing sdl (regenerated)'%s'", escapedSdlText);
       }
     }
 
@@ -2278,59 +2278,59 @@ version(unittest_sdl) unittest
     try {
 
       for(auto i = 0; i < expectedTags.length; i++) {
-	if(!parseSdlTag(&parsedTag, &next)) {
-	  writefln("Expected %s tag(s) but only got %s", expectedTags.length, i);
-	  writefln("Error: test on line %s", line);
-	  assert(0);
-	}
+        if(!parseSdlTag(&parsedTag, &next)) {
+          writefln("Expected %s tag(s) but only got %s", expectedTags.length, i);
+          writefln("Error: test on line %s", line);
+          assert(0);
+        }
 
-	static if(reparse) {
-	  if(previousDepth != size_t.max) {
-	    while(previousDepth > parsedTag.depth) {
-	      buffer2Sink.put("}");
-	      previousDepth--;
-	    }
-	  }
-	}
+        static if(reparse) {
+          if(previousDepth != size_t.max) {
+            while(previousDepth > parsedTag.depth) {
+              buffer2Sink.put("}");
+              previousDepth--;
+            }
+          }
+        }
 
-	auto expectedTag = expectedTags[i];
-	if(parsedTag.namespace != expectedTag.namespace) {
-	  writefln("Error: expected tag namespace '%s' but got '%s'", expectedTag.namespace, parsedTag.namespace);
-	  writefln("Error: test on line %s", line);
-	  assert(0);
-	}
-	if(parsedTag.name != expectedTag.name) {
-	  writefln("Error: expected tag name '%s' but got '%s'", expectedTag.name, parsedTag.name);
-	  writefln("Error: test on line %s", line);
-	  assert(0);
-	}
-	//writefln("[DEBUG] expected value '%s', actual values '%s'", expectedTag.values.data, parsedTag.values.data);
-	if(parsedTag.values.data != expectedTag.values.data) {
-	  writefln("Error: expected tag values '%s' but got '%s'", expectedTag.values.data, parsedTag.values.data);
-	  writefln("Error: test on line %s", line);
-	  assert(0);
-	}
-	if(parsedTag.attributes.data != expectedTag.attributes.data) {
-	  writefln("Error: expected tag attributes '%s' but got '%s'", expectedTag.attributes.data, parsedTag.attributes.data);
-	  writefln("Error: test on line %s", line);
-	  assert(0);
-	}
+        auto expectedTag = expectedTags[i];
+        if(parsedTag.namespace != expectedTag.namespace) {
+          writefln("Error: expected tag namespace '%s' but got '%s'", expectedTag.namespace, parsedTag.namespace);
+          writefln("Error: test on line %s", line);
+          assert(0);
+        }
+        if(parsedTag.name != expectedTag.name) {
+          writefln("Error: expected tag name '%s' but got '%s'", expectedTag.name, parsedTag.name);
+          writefln("Error: test on line %s", line);
+          assert(0);
+        }
+        //writefln("[DEBUG] expected value '%s', actual values '%s'", expectedTag.values.data, parsedTag.values.data);
+        if(parsedTag.values.data != expectedTag.values.data) {
+          writefln("Error: expected tag values '%s' but got '%s'", expectedTag.values.data, parsedTag.values.data);
+          writefln("Error: test on line %s", line);
+          assert(0);
+        }
+        if(parsedTag.attributes.data != expectedTag.attributes.data) {
+          writefln("Error: expected tag attributes '%s' but got '%s'", expectedTag.attributes.data, parsedTag.attributes.data);
+          writefln("Error: test on line %s", line);
+          assert(0);
+        }
 
-	// put the tag into the buffer2 sink to reparse again after
-	static if(reparse) {
-	  parsedTag.toSdl(&buffer2Sink);
-	  previousDepth = parsedTag.depth;
-	  if(parsedTag.hasOpenBrace) previousDepth++;
-	}
+        // put the tag into the buffer2 sink to reparse again after
+        static if(reparse) {
+          parsedTag.toSdl(&buffer2Sink);
+          previousDepth = parsedTag.depth;
+          if(parsedTag.hasOpenBrace) previousDepth++;
+        }
       }
 
       if(parseSdlTag(&parsedTag, &next)) {
-	writefln("Expected %s tag(s) but got at least one more (depth=%s, name='%s')",
-		 expectedTags.length, parsedTag.depth, parsedTag.name);
-	writefln("Error: test on line %s", line);
-	assert(0);
+        writefln("Expected %s tag(s) but got at least one more (depth=%s, name='%s')",
+                 expectedTags.length, parsedTag.depth, parsedTag.name);
+        writefln("Error: test on line %s", line);
+        assert(0);
       }
-      
+
     } catch(SdlParseException e) {
       writefln("[TEST] this sdl threw an unexpected SdlParseException: '%s'", escape(sdlText));
       writeln(e);
@@ -2345,15 +2345,15 @@ version(unittest_sdl) unittest
 
     static if(reparse) {
       if(previousDepth != size_t.max) {
-	while(previousDepth > parsedTag.depth) {
-	  buffer2Sink.put("}");
-	  previousDepth--;
-	}
+        while(previousDepth > parsedTag.depth) {
+          buffer2Sink.put("}");
+          previousDepth--;
+        }
       }
 
       if(buffer2Sink.slice != sdlText &&
-	 (buffer2Sink.slice.length && buffer2Sink.slice[0..$-1] != sdlText)) {
-	testParseSdl!false(false, buffer2Sink.slice, expectedTags, line);
+         (buffer2Sink.slice.length && buffer2Sink.slice[0..$-1] != sdlText)) {
+        testParseSdl!false(false, buffer2Sink.slice, expectedTags, line);
       }
     }
 
@@ -2431,7 +2431,7 @@ version(unittest_sdl) unittest
 
   auto validCharactersAfterTag =
     [" ", "\t", "\n", "\v", "\f", "\r", ";", "//", "\\", "#", "{}"];
-     
+
 
   auto namespaces = ["a:", "ab:", "abc:"];
   bool isProposedSdl = false;
@@ -2446,7 +2446,7 @@ version(unittest_sdl) unittest
     foreach(namespace; namespaces) {
       testParseSdl(false, namespace, [Tag(namespace~tagName)]);
       foreach(suffix; validCharactersAfterTag) {
-	testParseSdl(false, namespace~suffix, [Tag(namespace~tagName)]);
+        testParseSdl(false, namespace~suffix, [Tag(namespace~tagName)]);
       }
       testParseSdl(false, "tag1{"~namespace~"}", [Tag("tag1"), Tag(namespace~tagName)]);
     }
@@ -2528,9 +2528,9 @@ version(unittest_sdl) unittest
 
     foreach(keyword; keywords) {
       for(auto cutoff = 1; cutoff < keyword.length; cutoff++) {
-	sdlBuffer[afterTagName..afterTagName+cutoff] = keyword[0..cutoff];
-	//testInvalidSdl(false, sdlBuffer[0..afterTagName+cutoff]);
-	testParseSdl(false, sdlBuffer[0..afterTagName+cutoff], [Tag(expectedTagName, sdlBuffer[afterTagName..afterTagName+cutoff])]);
+        sdlBuffer[afterTagName..afterTagName+cutoff] = keyword[0..cutoff];
+        //testInvalidSdl(false, sdlBuffer[0..afterTagName+cutoff]);
+        testParseSdl(false, sdlBuffer[0..afterTagName+cutoff], [Tag(expectedTagName, sdlBuffer[afterTagName..afterTagName+cutoff])]);
       }
     }
     auto suffixes = [";", " \t;", "\n", "{}", " \t {\n }"];
@@ -2541,35 +2541,35 @@ version(unittest_sdl) unittest
       testParseSdl(false, sdlBuffer[0..limit], [Tag(expectedTagName, keyword)]);
 
       foreach(suffix; suffixes) {
-	sdlBuffer[limit..limit+suffix.length] = suffix;
-	testParseSdl(false, sdlBuffer[0..limit+suffix.length], [Tag(expectedTagName, keyword)]);
+        sdlBuffer[limit..limit+suffix.length] = suffix;
+        testParseSdl(false, sdlBuffer[0..limit+suffix.length], [Tag(expectedTagName, keyword)]);
       }
     }
     foreach(keyword; keywords) {
 
       foreach(attrNamespace; namespaces) {
 
-	for(auto cutoff = 1; cutoff <= keyword.length; cutoff++) {
-	  auto limit = afterTagName + attrNamespace.length;
-	  sdlBuffer[afterTagName..limit] = attrNamespace;
-	  limit += cutoff;
-	  sdlBuffer[limit - cutoff..limit] = keyword[0..cutoff];
-	  sdlBuffer[limit..limit+8] = `="value"`;
-	  testParseSdl(false, sdlBuffer[0..limit+8], [Tag(expectedTagName, format(`%s%s="value"`, attrNamespace, keyword[0..cutoff]))]);
+        for(auto cutoff = 1; cutoff <= keyword.length; cutoff++) {
+          auto limit = afterTagName + attrNamespace.length;
+          sdlBuffer[afterTagName..limit] = attrNamespace;
+          limit += cutoff;
+          sdlBuffer[limit - cutoff..limit] = keyword[0..cutoff];
+          sdlBuffer[limit..limit+8] = `="value"`;
+          testParseSdl(false, sdlBuffer[0..limit+8], [Tag(expectedTagName, format(`%s%s="value"`, attrNamespace, keyword[0..cutoff]))]);
 
-	  foreach(otherKeyword; keywords) {
-	    sdlBuffer[limit+1..limit+1+otherKeyword.length] = otherKeyword;
-	    testParseSdl(false, sdlBuffer[0..limit+1+otherKeyword.length],
-			 [Tag(expectedTagName, format("%s%s=%s", attrNamespace, keyword[0..cutoff], otherKeyword))]);
-	  }
-	}
+          foreach(otherKeyword; keywords) {
+            sdlBuffer[limit+1..limit+1+otherKeyword.length] = otherKeyword;
+            testParseSdl(false, sdlBuffer[0..limit+1+otherKeyword.length],
+                         [Tag(expectedTagName, format("%s%s=%s", attrNamespace, keyword[0..cutoff], otherKeyword))]);
+          }
+        }
 
       }
 
     }
   }
 
-  
+
 
 
   //
@@ -2630,7 +2630,7 @@ version(unittest_sdl) unittest
   enum numberPostfixes = ["", "l", "L", "f", "F", "d", "D", "bd", "BD"];
   {
     enum sdlPostfixes = ["", " ", ";", "\n"];
-    
+
     auto numbers = ["0", "12", "9876", "5432", /*".1",*/ "0.1", "12.4", /*"1.",*/ "8.04",  "123.l"];
 
 
@@ -2638,27 +2638,27 @@ version(unittest_sdl) unittest
       string prefix = negative ? "-" : "";
 
       foreach(postfix; numberPostfixes) {
-	foreach(number; numbers) {
+        foreach(number; numbers) {
 
-	  auto testNumber = prefix~number~postfix;
+          auto testNumber = prefix~number~postfix;
 
-	  if(postfix.length) {
-	    useProposed();
-	    //testInvalidSdl(false, "tag "~testNumber);
-	    useStrict();
-	  }
-	  //testInvalidSdl(false, "tag "~testNumber~"=");
+          if(postfix.length) {
+            useProposed();
+            //testInvalidSdl(false, "tag "~testNumber);
+            useStrict();
+          }
+          //testInvalidSdl(false, "tag "~testNumber~"=");
 
-	  foreach(sdlPostfix; sdlPostfixes) {
-	    testParseSdl(false, "tag "~testNumber~sdlPostfix, [Tag("tag", testNumber)]);
-	  }
-	}
+          foreach(sdlPostfix; sdlPostfixes) {
+            testParseSdl(false, "tag "~testNumber~sdlPostfix, [Tag("tag", testNumber)]);
+          }
+        }
       }
 
-      
+
     }
   }
-  
+
   //
   // Test parsing numbers and extracting them
   //
@@ -2668,71 +2668,71 @@ version(unittest_sdl) unittest
 
       foreach(postfix; numberPostfixes) {
 
-	void testNumber(Types...)(ulong expectedValue) {
-	  long expectedSignedValue = negative ? -1 * (cast(long)expectedValue) : cast(long)expectedValue;
+        void testNumber(Types...)(ulong expectedValue) {
+          long expectedSignedValue = negative ? -1 * (cast(long)expectedValue) : cast(long)expectedValue;
 
-	  foreach(Type; Types) {
-	    if(negative && isUnsigned!Type) continue;
-	    if(expectedSignedValue > Type.max) continue;
-	    static if( is(Type == float) || is(Type == double) || is(Type == real)) {
-	      if(expectedSignedValue < Type.min_normal) continue;
-	    } else {
-	      if(expectedSignedValue < Type.min) continue;
-	    }	       
+          foreach(Type; Types) {
+            if(negative && isUnsigned!Type) continue;
+            if(expectedSignedValue > Type.max) continue;
+            static if( is(Type == float) || is(Type == double) || is(Type == real)) {
+              if(expectedSignedValue < Type.min_normal) continue;
+            } else {
+              if(expectedSignedValue < Type.min) continue;
+            }
 
-	    debug writefln("[DEBUG] testing %s on %s", typeid(Type), parsedTag.values.data[0]);
-	    Type t;
-	    parsedTag.getOneValue(t);
-	    assert(t == cast(Type) expectedSignedValue, format("Expected (%s) %s but got %s", typeid(Type), expectedSignedValue, t));
-	  }
-	}
-	void testDecimalNumber(Types...)(real expectedValue) {
-	  foreach(Type; Types) {
-	    if(negative && isUnsigned!Type) continue;
-	    if(expectedValue > Type.max) continue;
-	    static if( is(Type == float) || is(Type == double) || is(Type == real)) {
-	      if(expectedValue < Type.min_normal) continue;
-	    } else {
-	      if(expectedValue < Type.min) continue;
-	    }	       
+            debug writefln("[DEBUG] testing %s on %s", typeid(Type), parsedTag.values.data[0]);
+            Type t;
+            parsedTag.getOneValue(t);
+            assert(t == cast(Type) expectedSignedValue, format("Expected (%s) %s but got %s", typeid(Type), expectedSignedValue, t));
+          }
+        }
+        void testDecimalNumber(Types...)(real expectedValue) {
+          foreach(Type; Types) {
+            if(negative && isUnsigned!Type) continue;
+            if(expectedValue > Type.max) continue;
+            static if( is(Type == float) || is(Type == double) || is(Type == real)) {
+              if(expectedValue < Type.min_normal) continue;
+            } else {
+              if(expectedValue < Type.min) continue;
+            }
 
-	    debug writefln("[DEBUG] testing %s on %s", typeid(Type), parsedTag.values.data[0]);
-	    Type t;
-	    parsedTag.getOneValue(t);
-	    assert(t - cast(Type) expectedValue < .01, format("Expected (%s) %s but got %s", typeid(Type), cast(Type)expectedValue, t));
-	  }
-	}
+            debug writefln("[DEBUG] testing %s on %s", typeid(Type), parsedTag.values.data[0]);
+            Type t;
+            parsedTag.getOneValue(t);
+            assert(t - cast(Type) expectedValue < .01, format("Expected (%s) %s but got %s", typeid(Type), cast(Type)expectedValue, t));
+          }
+        }
 
-	alias testNumber!(byte,ubyte,short,ushort,int,uint,long,ulong,float,double,real) testNumberOnAllTypes;
-	alias testDecimalNumber!(float,double,real) testDecimalNumberOnAllTypes;
-	
-	parseOneSdlTag(&parsedTag, cast(char[])"tag "~prefix~"0"~postfix);
-	testNumberOnAllTypes(0);
+        alias testNumber!(byte,ubyte,short,ushort,int,uint,long,ulong,float,double,real) testNumberOnAllTypes;
+        alias testDecimalNumber!(float,double,real) testDecimalNumberOnAllTypes;
 
-	parseOneSdlTag(&parsedTag, cast(char[])"tag "~prefix~"1"~postfix);
-	testNumberOnAllTypes(1);
+        parseOneSdlTag(&parsedTag, cast(char[])"tag "~prefix~"0"~postfix);
+        testNumberOnAllTypes(0);
 
-	parseOneSdlTag(&parsedTag, cast(char[])"tag "~prefix~"12"~postfix);
-	testNumberOnAllTypes(12);
+        parseOneSdlTag(&parsedTag, cast(char[])"tag "~prefix~"1"~postfix);
+        testNumberOnAllTypes(1);
 
-	parseOneSdlTag(&parsedTag, cast(char[])"tag "~prefix~"9987"~postfix);
-	testNumberOnAllTypes(9987);
+        parseOneSdlTag(&parsedTag, cast(char[])"tag "~prefix~"12"~postfix);
+        testNumberOnAllTypes(12);
 
-	parseOneSdlTag(&parsedTag, cast(char[])"tag "~prefix~"0.0"~postfix);
-	testDecimalNumberOnAllTypes(0.0);
+        parseOneSdlTag(&parsedTag, cast(char[])"tag "~prefix~"9987"~postfix);
+        testNumberOnAllTypes(9987);
 
-	parseOneSdlTag(&parsedTag, cast(char[])"tag "~prefix~".1"~postfix);
-	testDecimalNumberOnAllTypes(0.1);
+        parseOneSdlTag(&parsedTag, cast(char[])"tag "~prefix~"0.0"~postfix);
+        testDecimalNumberOnAllTypes(0.0);
 
-	parseOneSdlTag(&parsedTag, cast(char[])"tag "~prefix~".000001"~postfix);
-	testDecimalNumberOnAllTypes(0.000001);
+        parseOneSdlTag(&parsedTag, cast(char[])"tag "~prefix~".1"~postfix);
+        testDecimalNumberOnAllTypes(0.1);
 
-	parseOneSdlTag(&parsedTag, cast(char[])"tag "~prefix~"100384.999"~postfix);
-	testDecimalNumberOnAllTypes(100384.999);
+        parseOneSdlTag(&parsedTag, cast(char[])"tag "~prefix~".000001"~postfix);
+        testDecimalNumberOnAllTypes(0.000001);
 
-	parseOneSdlTag(&parsedTag, cast(char[])"tag "~prefix~"3.14159265"~postfix);
-	testDecimalNumberOnAllTypes(3.14159265);
-      }	
+        parseOneSdlTag(&parsedTag, cast(char[])"tag "~prefix~"100384.999"~postfix);
+        testDecimalNumberOnAllTypes(100384.999);
+
+        parseOneSdlTag(&parsedTag, cast(char[])"tag "~prefix~"3.14159265"~postfix);
+        testDecimalNumberOnAllTypes(3.14159265);
+      }
     }
 
   }
@@ -2780,7 +2780,7 @@ version(unittest_sdl) unittest
 
   testParseSdl(false, "tag {\nattr=value//\n}", [Tag("tag"), Tag("content", "attr=value")]);
   testParseSdl(false, "tag {\nattr=value}", [Tag("tag"), Tag("content", "attr=value")]);
-  
+
 
   testInvalidSdl(false, "tag what/huh");
   testInvalidSdl(false, `tag"value"`);
@@ -2873,7 +2873,7 @@ html:td "Puggy"
 /// SdlWalker walker = SdlWalker(&tag, sdl);
 /// while(walker.pop()) {
 ///     // use tag to process the current tag
-///     
+///
 ///     auto depth = tag.childrenDepth();
 ///     while(walker.pop(depth)) {
 ///         // process tag again as a child tag
@@ -2886,7 +2886,7 @@ struct SdlWalker
   /// A pointer to the tag structure that will be populated after parsing every tag.
   Tag* tag;
 
-  // The sdl text that has yet to be parsed.   
+  // The sdl text that has yet to be parsed.
   private char[] sdl;
 
   // Used for when a child walker has popped a parent tag
@@ -2906,8 +2906,8 @@ struct SdlWalker
     if(tagAlreadyPopped) {
       if(depth < tag.depth) throw new Exception("possible code bug here?");
       if(tag.depth == depth) {
-	tagAlreadyPopped = false;
-	return true;
+        tagAlreadyPopped = false;
+        return true;
       }
     }
 
@@ -2916,23 +2916,23 @@ struct SdlWalker
       const(char)[] previousName;
 
       if(!allowSkipChildren) {
-	previousDepth = tag.depth;
-	previousName = tag.name;
+        previousDepth = tag.depth;
+        previousName = tag.name;
       }
 
       if(!parseSdlTag(this.tag, &sdl)) {
-	assert(tag.depth == 0, format("code bug: parseSdlTag returned end of input but tag.depth was %s (not 0)", tag.depth));
-	return false;
+        assert(tag.depth == 0, format("code bug: parseSdlTag returned end of input but tag.depth was %s (not 0)", tag.depth));
+        return false;
       }
 
       if(this.tag.depth == depth) return true;
 
       // Check if it is the end of this set of children
       if(this.tag.depth < depth) {
-	tagAlreadyPopped = true;
-	return false;
+        tagAlreadyPopped = true;
+        return false;
       }
-      
+
       if(!allowSkipChildren) throw new Exception(format("forgot to call children on tag '%s' at depth %s", previousName, previousDepth));
     }
   }
@@ -2964,11 +2964,11 @@ version(unittest_sdl2)
     }
     bool opEquals(ref const Package p) {
       return
-	name == p.name &&
-	description == p.description &&
-	authors == p.authors &&
-	dependencies.data == p.dependencies.data &&
-	subPackages.data == p.subPackages.data;
+        name == p.name &&
+        description == p.description &&
+        authors == p.authors &&
+        dependencies.data == p.dependencies.data &&
+        subPackages.data == p.subPackages.data;
     }
     void parseSdlPackage(bool copySdl, string sdlText) {
       parseSdlPackage(setupSdlText(sdlText, copySdl));
@@ -2978,29 +2978,29 @@ version(unittest_sdl2)
       auto sdl = SdlWalker(&tag, sdlText);
       while(sdl.pop()) {
 
-	debug writefln("[sdl] (depth %s) tag '%s'%s", tag.depth, tag.name,
-		       tag.hasOpenBrace ? "(has children)" : "");
+        debug writefln("[sdl] (depth %s) tag '%s'%s", tag.depth, tag.name,
+                       tag.hasOpenBrace ? "(has children)" : "");
 
-	if(tag.name == "name") {
+        if(tag.name == "name") {
 
-	  tag.enforceNoAttributes();
-	  tag.enforceNoChildren();
-	  tag.getOneValue(this.name);
+          tag.enforceNoAttributes();
+          tag.enforceNoChildren();
+          tag.getOneValue(this.name);
 
-	} else if(tag.name == "description") {
+        } else if(tag.name == "description") {
 
-	  tag.enforceNoAttributes();
-	  tag.enforceNoChildren();
-	  tag.getOneValue(this.description);
+          tag.enforceNoAttributes();
+          tag.enforceNoChildren();
+          tag.getOneValue(this.description);
 
-	} else if(tag.name == "authors") {
+        } else if(tag.name == "authors") {
 
-	  if(this.authors !is null) tag.throwIsDuplicate();
-	  tag.enforceNoAttributes();
-	  tag.enforceNoChildren();
-	  tag.getValues(this.authors);
+          if(this.authors !is null) tag.throwIsDuplicate();
+          tag.enforceNoAttributes();
+          tag.enforceNoChildren();
+          tag.getValues(this.authors);
 
-	} else tag.throwIsUnknown();
+        } else tag.throwIsUnknown();
 
       }
 
@@ -3030,7 +3030,7 @@ version(unittest_sdl2) unittest
   Package expectedPackage;
 
   expectedPackage = Package("my-package", "an example sdl package",
-			    ["Jonathan", "David", "Amy"]);
+                            ["Jonathan", "David", "Amy"]);
 
   testPackage(false, `
 name        "my-package"
@@ -3060,10 +3060,10 @@ version(unittest_sdl2) unittest
     }
     bool opEquals(ref const Person p) {
       return
-	name == p.name &&
-	age == p.age &&
-	nicknames == p.nicknames &&
-	children == p.children;
+        name == p.name &&
+        age == p.age &&
+        nicknames == p.nicknames &&
+        children == p.children;
     }
     string toString() {
       return format("Person(\"%s\", %s, %s, %s)", name, age, nicknames, children);
@@ -3085,35 +3085,35 @@ version(unittest_sdl2) unittest
       auto depth = walker.childrenDepth();
       while(walker.pop(depth)) {
 
-	//writefln("[sdl] (depth %s) tag '%s'%s", tag.depth, tag.name,
-	//tag.hasOpenBrace ? "(has children)" : "");
-	//stdout.flush();
+        //writefln("[sdl] (depth %s) tag '%s'%s", tag.depth, tag.name,
+        //tag.hasOpenBrace ? "(has children)" : "");
+        //stdout.flush();
 
-	if(tag.name == "name") {
+        if(tag.name == "name") {
 
-	  tag.enforceNoAttributes();
-	  tag.enforceNoChildren();
-	  tag.getOneValue(name);
+          tag.enforceNoAttributes();
+          tag.enforceNoChildren();
+          tag.getOneValue(name);
 
-	} else if(tag.name == "age") {
+        } else if(tag.name == "age") {
 
-	  tag.enforceNoAttributes();
-	  tag.enforceNoChildren();
-	  tag.getOneValue(age);
+          tag.enforceNoAttributes();
+          tag.enforceNoChildren();
+          tag.getOneValue(age);
 
-	} else if(tag.name == "nicknames") {
+        } else if(tag.name == "nicknames") {
 
-	  tag.enforceNoAttributes();
-	  tag.enforceNoChildren();
-	  tag.getValues(nicknames);
+          tag.enforceNoAttributes();
+          tag.enforceNoChildren();
+          tag.getValues(nicknames);
 
-	} else if(tag.name == "child") {
+        } else if(tag.name == "child") {
 
-	  Person child = Person();
-	  child.parseFromSdl(walker);
-	  childBuilder.put(child);
+          Person child = Person();
+          child.parseFromSdl(walker);
+          childBuilder.put(child);
 
-	} else tag.throwIsUnknown();
+        } else tag.throwIsUnknown();
 
       }
 
@@ -3132,8 +3132,8 @@ version(unittest_sdl2) unittest
     while(walker.pop()) {
       if(tag.name == "person") {
 
-	person.parseFromSdl(walker);
-	people.put(person);
+        person.parseFromSdl(walker);
+        people.put(person);
 
       } else tag.throwIsUnknown();
     }
@@ -3162,9 +3162,9 @@ version(unittest_sdl2) unittest
     for(auto i = 0; i < expectedPeople.length; i++) {
       Person expectedPerson = expectedPeople[i];
       if(expectedPerson != parsedPeople.data[i]) {
-	writefln("Expected: %s", expectedPeople);
-	writefln(" but got: %s", parsedPeople.data);
-	assert(0);
+        writefln("Expected: %s", expectedPeople);
+        writefln(" but got: %s", parsedPeople.data);
+        assert(0);
       }
     }
 

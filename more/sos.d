@@ -149,12 +149,12 @@ template SosMethodTemplate(string methodName, Function)
   static if((ParameterTypeTuple!Function).length == 0) {
     shared auto SosMethodTemplate =
       new immutable SosMethodDefinition(methodName,
-					SosTypeName!(ReturnType!Function), null);
+                                        SosTypeName!(ReturnType!Function), null);
   } else {
     shared auto SosMethodTemplate =
       new immutable SosMethodDefinition(methodName,
-					SosTypeName!(ReturnType!Function),
-					[mixin(SosTypeNameStrings!(ParameterTypeTuple!Function))]);
+                                        SosTypeName!(ReturnType!Function),
+                                        [mixin(SosTypeNameStrings!(ParameterTypeTuple!Function))]);
   }
 }
 public class SosMethodDefinition
@@ -166,7 +166,7 @@ public class SosMethodDefinition
 
   public immutable string definition;
   public immutable this(string name, string returnSosTypeName,
-			immutable string[] parameterSosTypeNames)
+                        immutable string[] parameterSosTypeNames)
   {
     this.name = name;
     this.nameLowerCase = name.toLower();

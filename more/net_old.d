@@ -237,20 +237,20 @@ class TunnelThread : Thread
 
       ptrdiff_t bytesRead;
       if(selectSockets.isSet(socketA)) {
-	bytesRead = socketA.receive(buffer);
-	if(bytesRead == 0) {
-	  socketB.shutdown(SocketShutdown.BOTH);
-	  break;
-	}
-	socketB.send(buffer);
+        bytesRead = socketA.receive(buffer);
+        if(bytesRead == 0) {
+          socketB.shutdown(SocketShutdown.BOTH);
+          break;
+        }
+        socketB.send(buffer);
       }
       if(selectSockets.isSet(socketB)) {
-	bytesRead = socketB.receive(buffer);
-	if(bytesRead == 0) {
-	  socketA.shutdown(SocketShutdown.BOTH);
-	  break;
-	}
-	socketA.send(buffer);
+        bytesRead = socketB.receive(buffer);
+        if(bytesRead == 0) {
+          socketA.shutdown(SocketShutdown.BOTH);
+          break;
+        }
+        socketA.send(buffer);
       }
     }
     socketA.close();
@@ -341,10 +341,10 @@ class SimpleSelector : Thread, ISocketSelector
     while(true) {
       selectSockets.reset();
       foreach(i; 0..handlers.count) {
-	selectSockets.add(handlers.array[i].socket);
+        selectSockets.add(handlers.array[i].socket);
       }
       foreach(i; 0..dataHandlers.count) {
-	selectSockets.add(dataHandlers.array[i].socket);
+        selectSockets.add(dataHandlers.array[i].socket);
       }
 
       socketsAffected = Socket.select(selectSockets, null, null);
@@ -353,36 +353,36 @@ class SimpleSelector : Thread, ISocketSelector
 
       // Handle regular sockets
       foreach(i; 0..handlers.count) {
-	SocketAndHandler handler = handlers.array[i];
-	if(selectSockets.isSet(handler.socket)) {
-	  handler.handler(this, handler.socket);
-	  socketsAffected--;
-	  if(socketsAffected == 0) goto SELECT_LOOP_START;
-	}
+        SocketAndHandler handler = handlers.array[i];
+        if(selectSockets.isSet(handler.socket)) {
+          handler.handler(this, handler.socket);
+          socketsAffected--;
+          if(socketsAffected == 0) goto SELECT_LOOP_START;
+        }
       }
       // Handle data sockets
       for(size_t i = 0; i < dataHandlers.count; i++) {
-	auto socket = dataHandlers.array[i].socket;
-	if(selectSockets.isSet(socket)) {
-	  bytesRead = socket.receive(buffer);
-	  if(bytesRead <= 0) {
-	    dataHandlers.array[i].handler(this, dataHandlers.array[i], null);
-	    dataHandlers.removeAt(i);
-	    i--;
-	    debug{writefln("Removed DataSocket '%s' (%s data sockets left)", socket.tryRemoteAddressString(), dataHandlers.count);stdout.flush();}
-	  } else {
-	    debug{writefln("Received %s bytes", bytesRead);stdout.flush();}
-	    dataHandlers.array[i].handler(this, dataHandlers.array[i], buffer[0..bytesRead]);
-	    if(dataHandlers.array[i].handler is null) {
-	      try { socket.shutdown(SocketShutdown.BOTH); } catch { }
-	      try { socket.close(); } catch { }
-	      dataHandlers.removeAt(i);
-	      i--;
-	    }
-	  }
-	  socketsAffected--;
-	  if(socketsAffected == 0) goto SELECT_LOOP_START;
-	}
+        auto socket = dataHandlers.array[i].socket;
+        if(selectSockets.isSet(socket)) {
+          bytesRead = socket.receive(buffer);
+          if(bytesRead <= 0) {
+            dataHandlers.array[i].handler(this, dataHandlers.array[i], null);
+            dataHandlers.removeAt(i);
+            i--;
+            debug{writefln("Removed DataSocket '%s' (%s data sockets left)", socket.tryRemoteAddressString(), dataHandlers.count);stdout.flush();}
+          } else {
+            debug{writefln("Received %s bytes", bytesRead);stdout.flush();}
+            dataHandlers.array[i].handler(this, dataHandlers.array[i], buffer[0..bytesRead]);
+            if(dataHandlers.array[i].handler is null) {
+              try { socket.shutdown(SocketShutdown.BOTH); } catch { }
+              try { socket.close(); } catch { }
+              dataHandlers.removeAt(i);
+              i--;
+            }
+          }
+          socketsAffected--;
+          if(socketsAffected == 0) goto SELECT_LOOP_START;
+        }
       }
     }
   }

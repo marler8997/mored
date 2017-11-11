@@ -193,7 +193,7 @@ struct ShaderProgram
 
 
 void perspective(ref mat4 mat, float fieldOfViewYDegrees, float widthToHeightRatio,
-		 float zClipNear, float zClipFar)
+                 float zClipNear, float zClipFar)
 {
 
   float yMax = zClipNear * tan(fieldOfViewYDegrees * PI / 360);
@@ -202,7 +202,7 @@ void perspective(ref mat4 mat, float fieldOfViewYDegrees, float widthToHeightRat
   frustrum(mat, -xMax, xMax, -yMax, yMax, zClipNear, zClipFar);
 }
 void frustrum(ref mat4 mat, float left, float right,
-	      float bottom, float top, float zNear, float zFar)
+              float bottom, float top, float zNear, float zFar)
 {
   float temp   = 2 * zNear;
   float width  = right - left;

@@ -35,12 +35,12 @@ struct Rpm
     {
       auto lastDotIndex = filename.lastIndexOf('.');
       if(lastDotIndex >= 0) {
-	this.arch = filename[lastDotIndex+1..$];
-	if(isValidArch(this.arch)) {
-	  filename = filename[0..lastDotIndex];
-	} else {
-	  this.arch = null;
-	}
+        this.arch = filename[lastDotIndex+1..$];
+        if(isValidArch(this.arch)) {
+          filename = filename[0..lastDotIndex];
+        } else {
+          this.arch = null;
+        }
       }
     }
 
@@ -54,22 +54,22 @@ struct Rpm
 
       // Try to get the epoch
       {
-	auto colonIndex = evr.indexOf(':');
-	if(colonIndex >= 0) {
-	  this.epoch = to!ushort(evr[0..colonIndex]);
-	  this.version_ = evr[colonIndex+1..$];
-	} else {
-	  this.version_ = evr;
-	}
+        auto colonIndex = evr.indexOf(':');
+        if(colonIndex >= 0) {
+          this.epoch = to!ushort(evr[0..colonIndex]);
+          this.version_ = evr[colonIndex+1..$];
+        } else {
+          this.version_ = evr;
+        }
       }
 
       // Try to get the release
       {
-	auto releaseDashIndex = version_.indexOf('-');
-	if(releaseDashIndex >= 0) {
-	  release = version_[releaseDashIndex+1..$];
-	  version_ = version_[0..releaseDashIndex];
-	}
+        auto releaseDashIndex = version_.indexOf('-');
+        if(releaseDashIndex >= 0) {
+          release = version_[releaseDashIndex+1..$];
+          version_ = version_[0..releaseDashIndex];
+        }
       }
     }
   }
@@ -82,7 +82,7 @@ struct Rpm
 
     if(this.version_.length == 0) {
       if(other.version_.length != 0) {
-	return -1;
+        return -1;
       }
     } else {
       auto result = Rpm.cmp(this.version_, other.version_);
@@ -91,7 +91,7 @@ struct Rpm
 
     if(this.release.length == 0) {
       if(other.release.length != 0) {
-	return -1;
+        return -1;
       }
     } else {
       auto result = Rpm.cmp(this.release, other.release);
@@ -174,16 +174,16 @@ struct Rpm
     bool containsLetter = false;
     foreach(i, c; arch) {
       if(c >= 'a') {
-	if(c <= 'z') {
-	  containsLetter = true;
-	  continue;
-	}
-	return false;
+        if(c <= 'z') {
+          containsLetter = true;
+          continue;
+        }
+        return false;
       }
       if(
-	 (c <= '9' && c >= '0') ||
-	 (c == '_')
-	 ) continue;
+         (c <= '9' && c >= '0') ||
+         (c == '_')
+         ) continue;
       return false;
     }
     return containsLetter;
@@ -210,14 +210,14 @@ struct Rpm
 
       // Skip non-alpha-num characters
       while(one < oneLimit && !isAlphaNum(*one))
-	one++;
+        one++;
       while(two < twoLimit && !isAlphaNum(*two))
-	two++;
+        two++;
 
       if(one >= oneLimit)
-	return (two >= twoLimit) ? 0 : -1;
+        return (two >= twoLimit) ? 0 : -1;
       if(two >= twoLimit)
-	return 1;
+        return 1;
 
       auto str1 = one;
       auto str2 = two;
@@ -227,43 +227,43 @@ struct Rpm
       // segment and walk str1 and str2 to end of segmen
       if (isDigit(*str1)) {
 
-	if(!isDigit(*str2))
-	  return 1; // digits are newer than alpha chars
+        if(!isDigit(*str2))
+          return 1; // digits are newer than alpha chars
 
-	do { str1++; } while(str1 < oneLimit && isDigit(*str1));
-	do { str2++; } while(str2 < twoLimit && isDigit(*str2));
+        do { str1++; } while(str1 < oneLimit && isDigit(*str1));
+        do { str2++; } while(str2 < twoLimit && isDigit(*str2));
 
-	/* throw away any leading zeros - it's a number, right? */
-	while (*one == '0') { one++; if(one >= oneLimit) break;}
-	while (*two == '0') { two++; if(two >= twoLimit) break;}
+        /* throw away any leading zeros - it's a number, right? */
+        while (*one == '0') { one++; if(one >= oneLimit) break;}
+        while (*two == '0') { two++; if(two >= twoLimit) break;}
 
-	auto oneLength = str1 - one;
-	auto twoLength = str2 - two;
+        auto oneLength = str1 - one;
+        auto twoLength = str2 - two;
 
-	/* whichever number has more digits wins */
-	if (oneLength > twoLength) return 1;
-	if (twoLength > oneLength) return -1;
+        /* whichever number has more digits wins */
+        if (oneLength > twoLength) return 1;
+        if (twoLength > oneLength) return -1;
 
-	/* they have the same number of digits */
-	while(one < str1) {
-	  if(*one > *two) return 1;
-	  if(*two > *one) return -1;
-	  one++;
-	  two++;
-	}
+        /* they have the same number of digits */
+        while(one < str1) {
+          if(*one > *two) return 1;
+          if(*two > *one) return -1;
+          one++;
+          two++;
+        }
 
       } else {
 
-	if(isDigit(*str2))
-	  return -1; // digits are newer than alpha chars
+        if(isDigit(*str2))
+          return -1; // digits are newer than alpha chars
 
-	do { str1++; } while(str1 < oneLimit && isAlpha(*str1));
-	do { str2++; } while(str2 < twoLimit && isAlpha(*str2));
+        do { str1++; } while(str1 < oneLimit && isAlpha(*str1));
+        do { str2++; } while(str2 < twoLimit && isAlpha(*str2));
 
-	auto cmpResult = std.algorithm.cmp(one[0..str1-one], two[0..str2-two]);
-	if(cmpResult != 0) return -cmpResult;
-	one = str1;
-	two = str2;
+        auto cmpResult = std.algorithm.cmp(one[0..str1-one], two[0..str2-two]);
+        if(cmpResult != 0) return -cmpResult;
+        one = str1;
+        two = str2;
       }
 
     }

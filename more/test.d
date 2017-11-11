@@ -18,8 +18,8 @@ struct SourceFile
   SourceFile combine(SourceFile *other)
   {
     return SourceFile(filename,
-		      debug_ || other.debug_,
-		      unittest_ || unittest_);
+                      debug_ || other.debug_,
+                      unittest_ || unittest_);
   }
 }
 
@@ -27,8 +27,8 @@ void addFile(string filename, bool debug_, bool unittest_) {
   foreach(i, existingFile; sourceFiles.data) {
     if(filename == existingFile.filename) {
       sourceFiles.data[i] = SourceFile(filename,
-				 debug_ || existingFile.debug_,
-				 unittest_ || existingFile.unittest_);
+                                 debug_ || existingFile.debug_,
+                                 unittest_ || existingFile.unittest_);
       return;
     }
   }
@@ -97,10 +97,10 @@ int main(string[] args) {
   // DDox JSON -D -X -Xfdocs.json
 
   getopt(args,
-	 "D", &generateDoc,
-	 "debug", &debug_,
-	 "cov", &cov,
-	 "notest", &notest);
+         "D", &generateDoc,
+         "debug", &debug_,
+         "cov", &cov,
+         "notest", &notest);
 
   bool unittest_ = !notest;
 

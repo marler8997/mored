@@ -48,8 +48,8 @@ string prettyTime(float millis)
 
 template isChar(T) {
   static if(is(T == char) ||
-	    is(T == const char) ||
-	    is(T == immutable char))
+            is(T == const char) ||
+            is(T == immutable char))
     enum isChar = true;
   else
     enum isChar = false;
@@ -122,8 +122,8 @@ void assertEqual(string expected, string actual) pure
 {
   if(expected != actual) {
     throw new AssertError(format("Expected %s Actual %s",
-				 expected ? ('"' ~ expected ~ '"') : "<null>",
-				 actual   ? ('"' ~ actual   ~ '"') : "<null>"));
+                                 expected ? ('"' ~ expected ~ '"') : "<null>",
+                                 actual   ? ('"' ~ actual   ~ '"') : "<null>"));
   }
 }
 
@@ -269,7 +269,7 @@ struct CustomLineParser
   @property public void put(Data)(Data data) if ( (*data.ptr).sizeof == 1 )
   {
     debug writefln("[debug] ---> put(%4d bytes) : start %d check %d limit %d",
-		   data.length, (lineStart - buffer.ptr), lineCheckOffset, lineDataLimit);
+                   data.length, (lineStart - buffer.ptr), lineCheckOffset, lineDataLimit);
 
     size_t newDataOffset = (lineStart - buffer.ptr) + lineDataLimit;
     size_t bytesLeft = buffer.length - newDataOffset;
@@ -291,39 +291,39 @@ struct CustomLineParser
     lineDataLimit += data.length;
 
     debug writefln("[debug] <--- put             : start %d check %d limit %d",
-		   (lineStart - buffer.ptr), lineCheckOffset, lineDataLimit);
+                   (lineStart - buffer.ptr), lineCheckOffset, lineDataLimit);
   }
 
   /// Returns null when it has parsed all the lines that have been added
   public ubyte[] getLine()
   {
     debug writefln("[debug] ---> getLine         : start %d check %d limit %d",
-		   (lineStart - buffer.ptr), lineCheckOffset, lineDataLimit);
+                   (lineStart - buffer.ptr), lineCheckOffset, lineDataLimit);
 
     while(lineCheckOffset < lineDataLimit) {
       debug {
-	char c = lineStart[lineCheckOffset];
-	writefln("[debug] start[%s] = %s", lineCheckOffset, debugChar(c));
+        char c = lineStart[lineCheckOffset];
+        writefln("[debug] start[%s] = %s", lineCheckOffset, debugChar(c));
       }
       if(lineStart[lineCheckOffset] == '\n') {
-	ubyte[] line;
-	if(lineCheckOffset > 0 && lineStart[lineCheckOffset - 1] == '\r') {
-	  line = lineStart[0..lineCheckOffset - 1];
-	} else {
-	  line = lineStart[0..lineCheckOffset];
-	}
-	lineCheckOffset++;
-	lineDataLimit -= lineCheckOffset;
-	if(lineDataLimit > 0) {
-	  lineStart = lineStart + lineCheckOffset;
-	} else {
-	  lineStart = buffer.ptr;
-	}
-	lineCheckOffset = 0;
+        ubyte[] line;
+        if(lineCheckOffset > 0 && lineStart[lineCheckOffset - 1] == '\r') {
+          line = lineStart[0..lineCheckOffset - 1];
+        } else {
+          line = lineStart[0..lineCheckOffset];
+        }
+        lineCheckOffset++;
+        lineDataLimit -= lineCheckOffset;
+        if(lineDataLimit > 0) {
+          lineStart = lineStart + lineCheckOffset;
+        } else {
+          lineStart = buffer.ptr;
+        }
+        lineCheckOffset = 0;
 
-	debug writefln("[debug] <--- getLine line    : start %d check %d limit %d",
-		       (lineStart - buffer.ptr), lineCheckOffset, lineDataLimit);
-	return line;
+        debug writefln("[debug] <--- getLine line    : start %d check %d limit %d",
+                       (lineStart - buffer.ptr), lineCheckOffset, lineDataLimit);
+        return line;
       }
       lineCheckOffset++;
     }
@@ -343,11 +343,11 @@ struct CustomLineParser
     lineStart = buffer.ptr;
     debug {
       foreach(i,c; lineStart[0..lineDataLimit]) {
-	writefln("[debug] line[%s] = %s", i, debugChar(c));
+        writefln("[debug] line[%s] = %s", i, debugChar(c));
       }
     }
     debug writefln("[debug] <--- getLine no-line : start %d check %d limit %d",
-		   (lineStart - buffer.ptr), lineCheckOffset, lineDataLimit);
+                   (lineStart - buffer.ptr), lineCheckOffset, lineDataLimit);
     return null;
   }
 }
@@ -467,17 +467,17 @@ string tryParseFields(string comment = "#", T, C)(T fields, C[] line) if(isOutpu
     } else static if(comment != null && comment.length > 1) {
 
       if(c == comment[0]) {
-	size_t i = 1;
-	while(true) {
-	  if(off + i > line.length) break;
-	  c = line[off + i];
-	  if(c != comment[i]) break;
+        size_t i = 1;
+        while(true) {
+          if(off + i > line.length) break;
+          c = line[off + i];
+          if(c != comment[i]) break;
 
-	  i++;
-	  if(i >= comment.length) return null;
-	}
+          i++;
+          if(i >= comment.length) return null;
+        }
 
-	c = comment[0]; // restore state
+        c = comment[0]; // restore state
       }
 
     }
@@ -486,30 +486,30 @@ string tryParseFields(string comment = "#", T, C)(T fields, C[] line) if(isOutpu
       off++;
       startOfField = off;
       while(true) {
-	if(off >= line.length) return noEndingQuoteMessage;
-	c = line[off];
-	if(c == '"') {
-	  fields.put(line[startOfField..off]);
-	  break;
-	}
-	if(c == '\\') {
-	  throw new Exception("Escaping string not implemented yet");
-	}
-	off++;
+        if(off >= line.length) return noEndingQuoteMessage;
+        c = line[off];
+        if(c == '"') {
+          fields.put(line[startOfField..off]);
+          break;
+        }
+        if(c == '\\') {
+          throw new Exception("Escaping string not implemented yet");
+        }
+        off++;
       }
     } else {
       startOfField = off;
       while(true) {
-	off++;
-	if(off >= line.length) {
-	  fields.put(line[startOfField..$]);
-	  return null;
-	}
-	c = line[off];
-	if(c == ' ' || c == '\t') {
-	  fields.put(line[startOfField..off]);
-	  break;
-	}
+        off++;
+        if(off >= line.length) {
+          fields.put(line[startOfField..$]);
+          return null;
+        }
+        c = line[off];
+        if(c == ' ' || c == '\t') {
+          fields.put(line[startOfField..off]);
+          break;
+        }
       }
     }
   }
@@ -872,7 +872,7 @@ struct WriteBuffer(T)
   void put(const(T)[] array) {
     if(next + array.length > limit)
       throw new Exception(format("buffer has %s elements left but you tried to add %s",
-				 limit - next, array.length));
+                                 limit - next, array.length));
 
     foreach(value; array) {
       *next = value;
@@ -933,12 +933,12 @@ struct AsciiBufferedInput
 
     if(leftover) {
       if(leftover >= buffer.length) {
-	throw new Exception("Buffer not large enough");
+        throw new Exception("Buffer not large enough");
       }
 
       if(start > 0) {
-	memmove(buffer.ptr, buffer.ptr + start, leftover);
-	*offsetToShift -= leftover;
+        memmove(buffer.ptr, buffer.ptr + start, leftover);
+        *offsetToShift -= leftover;
       }
     }
 
@@ -966,9 +966,9 @@ struct FormattedBinaryWriter
 
   string offsetFormat;
   mixin(bitfields!
-	(bool, "hex", 1,
-	 bool, "text", 1,
-	 void, "", 6));
+        (bool, "hex", 1,
+         bool, "text", 1,
+         void, "", 6));
 
   size_t cachedData;
 
@@ -1011,14 +1011,14 @@ struct FormattedBinaryWriter
     if(hex) {
       prefix();
       foreach(b; data) {
-	formattedWrite(sink, " %02x", b);
+        formattedWrite(sink, " %02x", b);
       }
     }
 
     if(text) {
       prefix();
       foreach(b; data) {
-	writeAscii(b);
+        writeAscii(b);
       }
     }
 
@@ -1029,29 +1029,29 @@ struct FormattedBinaryWriter
     if(cachedData > 0) {
       bool atFirst = true;
       void prefix() {
-	if(atFirst) {atFirst = false; }
-	else { sink(" "); }
+        if(atFirst) {atFirst = false; }
+        else { sink(" "); }
       }
       if(offsetFormat) {
-	prefix();
-	formattedWrite(sink, offsetFormat, offset);
+        prefix();
+        formattedWrite(sink, offsetFormat, offset);
       }
 
       if(hex) {
-	prefix();
-	foreach(b; columnBuffer[0..cachedData]) {
-	  formattedWrite(sink, " %02x", b);
-	}
-	foreach(b; cachedData..columnBuffer.length) {
-	  sink("   ");
-	}
+        prefix();
+        foreach(b; columnBuffer[0..cachedData]) {
+          formattedWrite(sink, " %02x", b);
+        }
+        foreach(b; cachedData..columnBuffer.length) {
+          sink("   ");
+        }
       }
 
       if(text) {
-	prefix();
-	foreach(b; columnBuffer[0..cachedData]) {
-	  writeAscii(b);
-	}
+        prefix();
+        foreach(b; columnBuffer[0..cachedData]) {
+          writeAscii(b);
+        }
       }
 
       sink("\n");
@@ -1064,7 +1064,7 @@ struct FormattedBinaryWriter
     if(cachedData > 0) {
       auto combineLength = columnBuffer.length - cachedData;
       if(combineLength > data.length) {
-	combineLength = data.length;
+        combineLength = data.length;
       }
       columnBuffer[cachedData..cachedData+combineLength] = data[];
       writeRow(columnBuffer);
@@ -1148,12 +1148,12 @@ struct StringByLine
     if(startOfLineOffset < s.length) {
       startOfLineOffset = endOfLineOffset;
       while(true) {
-	if(endOfLineOffset >= s.length) break;
-	if(s[endOfLineOffset] == '\n') {
-	  endOfLineOffset++;
-	  break;
-	}
-	endOfLineOffset++;
+        if(endOfLineOffset >= s.length) break;
+        if(s[endOfLineOffset] == '\n') {
+          endOfLineOffset++;
+          break;
+        }
+        endOfLineOffset++;
       }
     }
   }
@@ -1171,13 +1171,13 @@ version(unittest_common) unittest
 
     foreach(expectedString; expectedStrings) {
       if(stringByLine.empty) {
-	writefln("Expected string '%s' but no more strings", escape(expectedString));
-	assert(0);
+        writefln("Expected string '%s' but no more strings", escape(expectedString));
+        assert(0);
       }
       if(expectedString != stringByLine.front) {
-	writefln("Expected: '%s'", escape(expectedString));
-	writefln("Actual  : '%s'", escape(stringByLine.front));
-	assert(0);
+        writefln("Expected: '%s'", escape(expectedString));
+        writefln("Actual  : '%s'", escape(stringByLine.front));
+        assert(0);
       }
       stringByLine.popFront;
     }
@@ -1240,7 +1240,7 @@ struct LinesChunker
     } else {
       // TODO: do I need this check? Can this ever happen?
       if(leftOver.ptr != buffer.ptr) {
-	memmove(buffer.ptr, leftOver.ptr, leftOver.length);
+        memmove(buffer.ptr, leftOver.ptr, leftOver.length);
       }
       bufferOffset = leftOver.length;
       leftOver = null;
@@ -1251,12 +1251,12 @@ struct LinesChunker
     //
     while(true) {
       if(bufferOffset >= buffer.length) {
-	if(tooSmall == BufferTooSmall.returnPartialData) {
-	  return bufferOffset;
-	} else if(tooSmall == BufferTooSmall.resizeBuffer) {
-	  throw new Exception("BufferTooSmall.resizeBuffer is not implemented in LinesChunker");
-	}
-	throw new Exception(format("the current buffer of length %s is too small to hold the current line", buffer.length));
+        if(tooSmall == BufferTooSmall.returnPartialData) {
+          return bufferOffset;
+        } else if(tooSmall == BufferTooSmall.resizeBuffer) {
+          throw new Exception("BufferTooSmall.resizeBuffer is not implemented in LinesChunker");
+        }
+        throw new Exception(format("the current buffer of length %s is too small to hold the current line", buffer.length));
       }
 
       size_t readLength = reader(buffer[bufferOffset .. $]);
@@ -1265,15 +1265,15 @@ struct LinesChunker
       auto totalLength = bufferOffset + readLength;
       auto i = totalLength - 1;
       while(true) {
-	auto c = buffer[i];
-	if(c == '\n') {
-	  leftOver = buffer[i+1..totalLength];
-	  return i+1;
-	}
-	if(i == bufferOffset) {
-	  break;
-	}
-	i--;
+        auto c = buffer[i];
+        if(c == '\n') {
+          leftOver = buffer[i+1..totalLength];
+          return i+1;
+        }
+        if(i == bufferOffset) {
+          break;
+        }
+        i--;
       }
 
       bufferOffset = totalLength;
@@ -1290,7 +1290,7 @@ version(unittest_common)
       if(chunkIndex >= chunks.length) return 0;
       auto chunk = chunks[chunkIndex++];
       if(chunk.length > buffer.length) {
-	assert(0, format("Chunk at index %s is %s bytes but the buffer is only %s", chunkIndex, chunk.length, buffer.length));
+        assert(0, format("Chunk at index %s is %s bytes but the buffer is only %s", chunkIndex, chunk.length, buffer.length));
       }
       buffer[0..chunk.length] = chunk;
       return chunk.length;
@@ -1343,13 +1343,13 @@ version(unittest_common) unittest
     foreach(expectedChunk; expectedChunks) {
       size_t actualLength = lineChunker.read(reader);
       if(chunkerBuffer[0..actualLength] != expectedChunk) {
-	writefln("Expected: '%s'", escape(expectedChunk));
-	writefln("Actual  : '%s'", escape(chunkerBuffer[0..actualLength]));
-	assert(0);
+        writefln("Expected: '%s'", escape(expectedChunk));
+        writefln("Actual  : '%s'", escape(chunkerBuffer[0..actualLength]));
+        assert(0);
       }
 /+
       debug {
-	writefln("
+        writefln("
       }
 +/
     }
@@ -1421,14 +1421,14 @@ struct LineReader
     if(endOfLineOffset >= dataLength) {
 
       if(this.line is null) {
-	//writefln("[DEBUG] LineReader.popFront no more data");
-	return;
+        //writefln("[DEBUG] LineReader.popFront no more data");
+        return;
       }
       this.dataLength = this.chunker.read(reader);
       if(this.dataLength == 0) {
-	this.line = null;
-	//writefln("[DEBUG] LineReader.popFront no more data");
-	return;
+        this.line = null;
+        //writefln("[DEBUG] LineReader.popFront no more data");
+        return;
       }
       endOfLineOffset = 0;
     }
@@ -1436,14 +1436,14 @@ struct LineReader
     auto startOfNextLine = endOfLineOffset;
     while(true) {
       if(chunker.buffer[endOfLineOffset] == '\n') {
-	endOfLineOffset++;
-	line = chunker.buffer[startOfNextLine..endOfLineOffset];
-	break;
+        endOfLineOffset++;
+        line = chunker.buffer[startOfNextLine..endOfLineOffset];
+        break;
       }
       endOfLineOffset++;
       if(endOfLineOffset >= dataLength) {
-	line = chunker.buffer[startOfNextLine..endOfLineOffset];
-	break;
+        line = chunker.buffer[startOfNextLine..endOfLineOffset];
+        break;
       }
     }
 
@@ -1471,17 +1471,17 @@ version(unittest_common) unittest
 
   void testLines(string data, size_t testLine = __LINE__) {
     CustomChunks customChunks;
-	
+        
     for(auto chunkSize = 1; chunkSize <= data.length; chunkSize++) {
 
       // Create Chunks
       string[] chunks;
       size_t offset;
       for(offset = 0; offset + chunkSize <= data.length; offset += chunkSize) {
-	chunks ~= data[offset .. offset + chunkSize];
+        chunks ~= data[offset .. offset + chunkSize];
       }
       if(data.length - offset > 0) {
-	chunks ~= data[offset .. $];
+        chunks ~= data[offset .. $];
       }
       //writefln("ChunkSize %s Chunks %s", chunkSize, chunks);
 
@@ -1493,24 +1493,24 @@ version(unittest_common) unittest
       
       size_t lineNumber = 1;
       foreach(line; data.byLine()) {
-	//writefln("[DEBUG] line %s '%s'", lineNumber, escape(line));
+        //writefln("[DEBUG] line %s '%s'", lineNumber, escape(line));
 
-	if(lineReader.empty) {
-	  writefln("Expected line '%s' but no more lines", escape(line));
-	  assert(0);
-	}
-	if(line != lineReader.front) {
-	  writefln("Expected: '%s'", escape(line));
-	  writefln("Actual  : '%s'", escape(lineReader.front));
-	  assert(0);
-	}
-	lineReader.popFront;
-	lineNumber++;
+        if(lineReader.empty) {
+          writefln("Expected line '%s' but no more lines", escape(line));
+          assert(0);
+        }
+        if(line != lineReader.front) {
+          writefln("Expected: '%s'", escape(line));
+          writefln("Actual  : '%s'", escape(lineReader.front));
+          assert(0);
+        }
+        lineReader.popFront;
+        lineNumber++;
       }
 
       if(!lineReader.empty) {
-	writefln("Got extra line '%s' but expected no more lines", escape(lineReader.front));
-	assert(0);
+        writefln("Got extra line '%s' but expected no more lines", escape(lineReader.front));
+        assert(0);
       }
 
     }

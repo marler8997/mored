@@ -31,8 +31,8 @@ Note: if '|' and '{' '}' are at the same depth, the curly braces
     size_t off = permutation.length - 1;
     while(true) {
       if(permutation[off] < max) {
-	permutation[off]++;
-	return true;
+        permutation[off]++;
+        return true;
       }
       permutation[off] = 0;
       if(off == 0) return false;
@@ -58,18 +58,18 @@ Note: if '|' and '{' '}' are at the same depth, the curly braces
     bool empty() { return isEmpty; }
     void putInto(ref WriteBuffer!char buffer) {
       foreach(idx; currentPermutationBuffer) {
-	buffer.put(elements[idx]);
+        buffer.put(elements[idx]);
       }
     }
     void popFront() {
       bool isNowEmpty = !nextPermutation(this.currentPermutationBuffer, elements.length - 1);
       if(isNowEmpty) {
-	if(currentPermutationBuffer.length >= fullPermutationIndexBuffer.length) {
-	  this.isEmpty = true;
-	} else {
-	  currentPermutationBuffer.length++;
-	  currentPermutationBuffer[] = 0;
-	}
+        if(currentPermutationBuffer.length >= fullPermutationIndexBuffer.length) {
+          this.isEmpty = true;
+        } else {
+          currentPermutationBuffer.length++;
+          currentPermutationBuffer[] = 0;
+        }
       }
     }
   }

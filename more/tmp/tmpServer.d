@@ -79,11 +79,11 @@ struct AccessorConnection
 
     try {
       if(connector is null) {
-	debug writeln("No Proxy");
-	socket.connect(accessorAddress);
+        debug writeln("No Proxy");
+        socket.connect(accessorAddress);
       } else {
-	debug writeln("Has Proxy");
-	connector.connect(socket, accessorAddress);
+        debug writeln("Has Proxy");
+        connector.connect(socket, accessorAddress);
       }
     } catch(Exception e) {
       writefln("Failed to connect: %s",  e);
@@ -105,9 +105,9 @@ struct AccessorConnection
       // Only receive packet if tls was not required
       //
       if(!tlsSettings.requireTlsForTmpConnections) {
-	ptrdiff_t bytesRead = socket.receive(connectionInfoPacket);
-	if(bytesRead <= 0) throw new SocketException("Disconnected while waiting for connection info response");
-	setupTls = ReadTlsRequirementFromAccessorToServer(connectionInfoPacket[0]);
+        ptrdiff_t bytesRead = socket.receive(connectionInfoPacket);
+        if(bytesRead <= 0) throw new SocketException("Disconnected while waiting for connection info response");
+        setupTls = ReadTlsRequirementFromAccessorToServer(connectionInfoPacket[0]);
       }
 
       //
@@ -117,7 +117,7 @@ struct AccessorConnection
       accessorSendHandler.socket = socket;
 
       if(setupTls) {
-	throw new Exception("Tls not yet implemented");
+        throw new Exception("Tls not yet implemented");
       }
 
       //
@@ -211,9 +211,9 @@ void main(string[] args)
     return;
   }
   getopt(args,
-	 "h|heartbeat-time", &(serverInfo.heartbeatSeconds),
+         "h|heartbeat-time", &(serverInfo.heartbeatSeconds),
          "w|reconnect-time", &(serverInfo.reconnectWaitSeconds),
-	 "r|read-length", &readBufferLength);
+         "r|read-length", &readBufferLength);
 
   if(args.length != 3) {
     writefln("Error: expected 2 non-option arguments but got %s", args.length - 1);
@@ -260,19 +260,19 @@ void main(string[] args)
     //
     if(!accessor.connected) {
       if(dataSockets.count == 0) {
-	while(true) {
-	  writeln("Attempting to connect to accessor...");
-	  stdout.flush();
-	  if(accessor.tryConnect(sendBuffer, serverInfo)) {
-	    writeln("Connected to accessor...need to implement...");
-	    stdout.flush();
-	    break;
-	  } else {
-	    writefln("Connect to accessor failed...retry in %s seconds", reconnectDuration.total!"seconds");
-	    stdout.flush();
-	    Thread.sleep(reconnectDuration);
-	  }
-	}
+        while(true) {
+          writeln("Attempting to connect to accessor...");
+          stdout.flush();
+          if(accessor.tryConnect(sendBuffer, serverInfo)) {
+            writeln("Connected to accessor...need to implement...");
+            stdout.flush();
+            break;
+          } else {
+            writefln("Connect to accessor failed...retry in %s seconds", reconnectDuration.total!"seconds");
+            stdout.flush();
+            Thread.sleep(reconnectDuration);
+          }
+        }
       }
     }
 

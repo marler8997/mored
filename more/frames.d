@@ -50,7 +50,7 @@ class FrameAndHeartbeatFilter
     } else {
       uint combinedLength = storedLength + data.length;
       if(combinedLength > storeBuffer.length) {
-	storeBuffer.length = combinedLength;
+        storeBuffer.length = combinedLength;
       }
       memcpy(storeBuffer.ptr + storedLength, data.ptr, data.length);
       handleData(storeBuffer[0..combinedLength]);
@@ -76,58 +76,58 @@ class FrameAndHeartbeatFilter
       // Process the command
       //
       if(dataLeft < 4) {
-	//
-	// copy left over bytes
-	//
-	if(offset > 0 || data.ptr != storeBuffer.ptr) {
-	  if(storeBuffer.length < 4) storeBuffer.length = 4;
-	  debug {
-	    write("moving [");
-	    data[offset..offset+dataLeft].writeHex();
-	    writeln(" ] to store buffer");
-	  }
-	  memcpy(storeBuffer.ptr, data.ptr + offset, dataLeft);
-	}
-	storedLength = dataLeft;
-	return;
+        //
+        // copy left over bytes
+        //
+        if(offset > 0 || data.ptr != storeBuffer.ptr) {
+          if(storeBuffer.length < 4) storeBuffer.length = 4;
+          debug {
+            write("moving [");
+            data[offset..offset+dataLeft].writeHex();
+            writeln(" ] to store buffer");
+          }
+          memcpy(storeBuffer.ptr, data.ptr + offset, dataLeft);
+        }
+        storedLength = dataLeft;
+        return;
       }
 
       uint totalFrameLength = 4U + (
-			      (cast(uint)data[offset    ] << 24) |
-			      (cast(uint)data[offset + 1] << 16) |
-			      (cast(uint)data[offset + 2] <<  8) |
-			      (cast(uint)data[offset + 3]      ) );
+                              (cast(uint)data[offset    ] << 24) |
+                              (cast(uint)data[offset + 1] << 16) |
+                              (cast(uint)data[offset + 2] <<  8) |
+                              (cast(uint)data[offset + 3]      ) );
 
       debug writefln("totalFrameLength %d dataLeft %d", totalFrameLength, dataLeft);
       if(totalFrameLength > dataLeft) {
-	//
-	// copy left over bytes
-	//
-	if(offset > 0 || data.ptr != storeBuffer.ptr) {
-	  if(storeBuffer.length < totalFrameLength) storeBuffer.length = totalFrameLength;
-	  debug {
-	    write("moving [");
-	    data[offset..offset+dataLeft].writeHex();
-	    writeln(" ] to store buffer");
-	  }
-	  memcpy(storeBuffer.ptr, data.ptr + offset, dataLeft);
-	}
-	storedLength = dataLeft;
-	return;
+        //
+        // copy left over bytes
+        //
+        if(offset > 0 || data.ptr != storeBuffer.ptr) {
+          if(storeBuffer.length < totalFrameLength) storeBuffer.length = totalFrameLength;
+          debug {
+            write("moving [");
+            data[offset..offset+dataLeft].writeHex();
+            writeln(" ] to store buffer");
+          }
+          memcpy(storeBuffer.ptr, data.ptr + offset, dataLeft);
+        }
+        storedLength = dataLeft;
+        return;
       }
 
       debug {
-	writef("data offset=%s totalFrameLength=%s:", offset, totalFrameLength);
-	data[offset..offset+totalFrameLength].writelnHex();
+        writef("data offset=%s totalFrameLength=%s:", offset, totalFrameLength);
+        data[offset..offset+totalFrameLength].writelnHex();
       }
       dataHandler(data[offset + 4..offset + totalFrameLength]);
       offset += totalFrameLength;
       dataLeft -= totalFrameLength;
 
       if(dataLeft <= 0) {
-	debug writeln("no data left");
-	storedLength = 0;
-	break;
+        debug writeln("no data left");
+        storedLength = 0;
+        break;
       }
     }
   }
@@ -145,7 +145,7 @@ unittest
     public void expectFrames(ubyte[][] frames...)
     {
       foreach(ubyte[] frame; frames) {
-	nextExpectedFrames.insertBack(frame);
+        nextExpectedFrames.insertBack(frame);
       }
     }
     void handleData(const ubyte[] data)
@@ -153,11 +153,11 @@ unittest
       assert(!nextExpectedFrames.empty());
 
       if(data.length > 10) {
-	writefln("Got Frame [%s bytes...]", data.length);
+        writefln("Got Frame [%s bytes...]", data.length);
       } else {
-	write("Got Frame [");
-	data.writeHex();
-	writeln(" ]");
+        write("Got Frame [");
+        data.writeHex();
+        writeln(" ]");
       }
 
       ubyte[] expectedData = nextExpectedFrames.front();
@@ -165,12 +165,12 @@ unittest
 
 
       if(expectedData != data) {
-	writeln("Data Mismatch:");
-	write("    ExpectedData:");
-	expectedData.writelnHex();
-	write("    ActualData  :");
-	data.writelnHex();
-	assert(0);
+        writeln("Data Mismatch:");
+        write("    ExpectedData:");
+        expectedData.writelnHex();
+        write("    ActualData  :");
+        data.writelnHex();
+        assert(0);
       }
     }
   }
@@ -253,14 +253,14 @@ unittest
       uint offset = 0;
       writefln("Test FilterSize: %s", filterSize);
       while(offset + filterSize < 5) {
-	ubyte[] partial = frame[offset..offset+filterSize];
+        ubyte[] partial = frame[offset..offset+filterSize];
 
-	//write("    filter [");
-	//writeHex(partial);
-	//writeln("]");
+        //write("    filter [");
+        //writeHex(partial);
+        //writeln("]");
 
-	filter.filter(partial);
-	offset += filterSize;
+        filter.filter(partial);
+        offset += filterSize;
       }
       tester.expectFrames(frame[4..$]);
 

@@ -17,7 +17,7 @@
            if(age == 0) throw new Exception("person is missing the 'age' tag");
        }
    }
-   
+
    char[] sdl;
 
    // ...read SDL into char[] sdl
@@ -25,7 +25,7 @@
    Person p;
    parseSdlInto!Person(sdl);
    ----------------------------------
-   
+
 
 
 
@@ -53,7 +53,7 @@ version = DebugSdlReflection;
 string debugSdlReflection(string object, string member, string message, bool submessage = false)
 {
   return format("version(DebugSdlReflection) pragma(msg, \"[DebugSdlReflection] %s%s.%s %s\");",
-		submessage ? "    " : "", object, member, message);
+                submessage ? "    " : "", object, member, message);
 }
 
 
@@ -120,7 +120,7 @@ template isOutRange(R) {
 template AppenderElementType(T) {
   static if( !__traits(hasMember, T, "data") ) {
     alias AppenderElementType = void;
-  } else static if( is( ElementType!(typeof(__traits(getMember, T, "data"))) == void) )  { 
+  } else static if( is( ElementType!(typeof(__traits(getMember, T, "data"))) == void) )  {
     alias AppenderElementType = void;
   } else {
     alias AppenderElementType = Unqual!(ElementType!(typeof(__traits(getMember, T, "data"))));
@@ -156,7 +156,7 @@ void parseSdlInto(T)(ref T obj, char[] sdl)
 void parseSdlInto(T)(ref T obj, ref SdlWalker walker, char[] sdl, size_t depth) if( is( T == struct) )
 {
   Tag* tag = walker.tag;
-  
+
   if(depth > 0) {
     //
     // Process attributes and values
@@ -170,7 +170,7 @@ void parseSdlInto(T)(ref T obj, ref SdlWalker walker, char[] sdl, size_t depth) 
     debug writefln("[DEBUG] parseSdlInto: at depth %s tag '%s'", tag.depth, tag.name);
 
     foreach(memberIndex, copyOfMember; obj.tupleof) {
-    
+
       alias typeof(T.tupleof[memberIndex]) memberType;
       enum memberString = T.tupleof[memberIndex].stringof;
 
@@ -182,207 +182,207 @@ void parseSdlInto(T)(ref T obj, ref SdlWalker walker, char[] sdl, size_t depth) 
 
       static if(memberString == "this") {
 
-	mixin(debugSdlReflection(T.stringof, memberString, "ignored because 'this' is always ignored"));
-	
+        mixin(debugSdlReflection(T.stringof, memberString, "ignored because 'this' is always ignored"));
+
       } else static if(containsFlag!(SdlReflection.ignore, memberAttributes)) {
 
-	mixin(debugSdlReflection(T.stringof, memberString, "ignored from SdlReflection.ignore"));
+        mixin(debugSdlReflection(T.stringof, memberString, "ignored from SdlReflection.ignore"));
 
       } else static if( is( memberType == function) ) {
 
-	mixin(debugSdlReflection(T.stringof, memberString, "ignored because it is a function"));
+        mixin(debugSdlReflection(T.stringof, memberString, "ignored because it is a function"));
 
       } else static if( isAppender || ( !is( memberElementType == void ) && !isSomeString!(memberType) ) ) {
 
 
-	static if(isAppender) {
-	  mixin(debugSdlReflection(T.stringof, memberString, "deserialized as a list, specifically an appender"));
+        static if(isAppender) {
+          mixin(debugSdlReflection(T.stringof, memberString, "deserialized as a list, specifically an appender"));
 
-	  template addValues(string memberName) {
-	    void addValues() {
-	      auto elementOffset = __traits(getMember, obj, memberString).data.length;
-	      __traits(getMember, obj, memberString).reserve(elementOffset + tag.values.data.length);
-	      AppenderElementType!(memberType) deserializedValue;
+          template addValues(string memberName) {
+            void addValues() {
+              auto elementOffset = __traits(getMember, obj, memberString).data.length;
+              __traits(getMember, obj, memberString).reserve(elementOffset + tag.values.data.length);
+              AppenderElementType!(memberType) deserializedValue;
 
-	      foreach(value; tag.values.data) {
-		if(!sdlLiteralToD!(AppenderElementType!(memberType))( value, deserializedValue)) {
-		  throw new SdlParseException(tag.line, format("failed to convert '%s' to %s for appender %s.%s",
-							       value, memberElementType.stringof, T.stringof, memberString) );
-		}
-		__traits(getMember, obj, memberString).put(deserializedValue);
-		elementOffset++;
-	      }
-	    }
-	  }
+              foreach(value; tag.values.data) {
+                if(!sdlLiteralToD!(AppenderElementType!(memberType))( value, deserializedValue)) {
+                  throw new SdlParseException(tag.line, format("failed to convert '%s' to %s for appender %s.%s",
+                                                               value, memberElementType.stringof, T.stringof, memberString) );
+                }
+                __traits(getMember, obj, memberString).put(deserializedValue);
+                elementOffset++;
+              }
+            }
+          }
 
-	} else {
+        } else {
 
-	  mixin(debugSdlReflection(T.stringof, memberString, "deserialized as a list, specifically an array"));
+          mixin(debugSdlReflection(T.stringof, memberString, "deserialized as a list, specifically an array"));
 
-	  template addValues(string memberName) {
-	    void addValues() {
-	      auto elementOffset = __traits(getMember, obj, memberString).length;
+          template addValues(string memberName) {
+            void addValues() {
+              auto elementOffset = __traits(getMember, obj, memberString).length;
 
-	      __traits(getMember, obj, memberString).length += tag.values.data.length;
-	      foreach(value; tag.values.data) {
-		if(!sdlLiteralToD!(memberElementType)( value, __traits(getMember, obj, memberString)[elementOffset] ) ) {
-		  throw new SdlParseException(tag.line, format("failed to convert '%s' to %s for array member %s.%s",
-							       value, memberElementType.stringof, T.stringof, memberString) );
-		}
-		elementOffset++;
-	      }
-	    }
-	  }
+              __traits(getMember, obj, memberString).length += tag.values.data.length;
+              foreach(value; tag.values.data) {
+                if(!sdlLiteralToD!(memberElementType)( value, __traits(getMember, obj, memberString)[elementOffset] ) ) {
+                  throw new SdlParseException(tag.line, format("failed to convert '%s' to %s for array member %s.%s",
+                                                               value, memberElementType.stringof, T.stringof, memberString) );
+                }
+                elementOffset++;
+              }
+            }
+          }
 
-	}
+        }
 
-	static if(containsFlag!(SdlReflection.onlySingularTags, memberAttributes)) {
-	  mixin(debugSdlReflection(T.stringof, memberString, format("onlySingularTags so will not handle tags named '%s'", memberString), true));
-	} else {
+        static if(containsFlag!(SdlReflection.onlySingularTags, memberAttributes)) {
+          mixin(debugSdlReflection(T.stringof, memberString, format("onlySingularTags so will not handle tags named '%s'", memberString), true));
+        } else {
 
-	  if(tag.name == memberString) {
+          if(tag.name == memberString) {
 
-	    tag.enforceNoAttributes();
+            tag.enforceNoAttributes();
 
-	    //
-	    // Add tag values to the array
-	    //
-	    static if( !is( ElementType!(memberElementType) == void ) && !isSomeString!(memberElementType) ) {
+            //
+            // Add tag values to the array
+            //
+            static if( !is( ElementType!(memberElementType) == void ) && !isSomeString!(memberElementType) ) {
 
-	      implement("list of arrays");
+              implement("list of arrays");
 
-	    } else static if( isAssociativeArray!(memberElementType)) {
+            } else static if( isAssociativeArray!(memberElementType)) {
 
-	      implement("list of assoc-arrays");
+              implement("list of assoc-arrays");
 
-	    } else static if( is ( isNested!( memberType ) ) ) {
+            } else static if( is ( isNested!( memberType ) ) ) {
 
-	      implement("list of functions/structs/classes");
+              implement("list of functions/structs/classes");
 
-	    } else {
+            } else {
 
-	      if(tag.values.data.length > 0) {
-		addValues!(memberString);
-	      }
+              if(tag.values.data.length > 0) {
+                addValues!(memberString);
+              }
 
-	    }
-
-
-	    if(tag.hasOpenBrace) {
-
-	      size_t arrayDepth = tag.depth + 1;
-	      while(walker.pop(arrayDepth)) {
-		
-		tag.enforceNoAttributes();
-		// Check if the tag can be converted to an array element
-		if(!tag.isAnonymous) {
-		  throw new SdlParseException(tag.line, format("the child elements of array member %s.%s can only use anonymous tags, but found a tag with name '%s'",
-							       T.stringof, memberString, tag.name));		  
-		}
-		
-		
-		static if( !isSomeString!(memberElementType) && isArray!(memberElementType)) {
-
-		  implement("using children for list of arrays");
-
-		} else static if( isAssociativeArray!(memberElementType)) {
-
-		  implement("using children for list of assoc-arrays");
-
-		} else static if( is ( isNested!(memberType) ) ) {
-
-		  implement("using children for list of functions/structs/classes");
-
-		} else {
-
-		  if(tag.values.data.length > 0) {
-
-		    addValues!(memberString);
-
-		  }
-		  
-		}
+            }
 
 
-	      }
-	      
-	    }
+            if(tag.hasOpenBrace) {
 
-	    continue TAG_LOOP;
-	  }
-	}
+              size_t arrayDepth = tag.depth + 1;
+              while(walker.pop(arrayDepth)) {
 
-	static if(containsFlag!(SdlReflection.noSingularTags, memberAttributes) ) {
-	  mixin(debugSdlReflection(T.stringof, memberString, "does not handle singular tags", true));
-	} else {
-	  static if(singularName!(T, memberString) is null) {
-	    static assert(0, format("Could not determine the singular name for %s.%s because it does not end with an 's'.  Use @(SdlSingularName(\"name\") to specify one.",
-				    T.stringof, memberString));
-	  }
-
-	  mixin(debugSdlReflection(T.stringof, memberString, format("handles singular tags named '%s'", singularName!(T, memberString)), true));
+                tag.enforceNoAttributes();
+                // Check if the tag can be converted to an array element
+                if(!tag.isAnonymous) {
+                  throw new SdlParseException(tag.line, format("the child elements of array member %s.%s can only use anonymous tags, but found a tag with name '%s'",
+                                                               T.stringof, memberString, tag.name));
+                }
 
 
-	  if(tag.name == singularName!(T, memberString)) {
+                static if( !isSomeString!(memberElementType) && isArray!(memberElementType)) {
 
-	    tag.enforceNoAttributes();
-	    tag.enforceNoChildren();
+                  implement("using children for list of arrays");
 
-	    static if( isArray!(memberElementType) &&
-		       !isSomeString!(memberElementType) ) {
+                } else static if( isAssociativeArray!(memberElementType)) {
 
-	      implement("singular list of arrays");
+                  implement("using children for list of assoc-arrays");
 
-	    } else static if( isAssociativeArray!(memberElementType)) {
+                } else static if( is ( isNested!(memberType) ) ) {
 
-	      implement("singular list of assoc-arrays");
+                  implement("using children for list of functions/structs/classes");
 
-	    } else static if( is ( isNested!(memberType) ) ) {
+                } else {
 
-	      implement("singular list of functions/structs/classes");
+                  if(tag.values.data.length > 0) {
 
-	    } else {
+                    addValues!(memberString);
 
-	      static if ( isAppender ) {
-		AppenderElementType!(memberType) value;
-	      } else {
-		memberElementType value;
-	      }
+                  }
 
-	      tag.getOneValue(value);
-	      __traits(getMember, obj, memberString) ~= value;
-	      debug writefln("[DEBUG] parseSdlInto: %s.%s was appended with '%s'", T.stringof, memberString, __traits(getMember, obj, memberString));
-	      continue TAG_LOOP;
-		    
-	    }
+                }
 
-	  }
-	    
-	}
 
-	// END OF HANDLING OUTPUT RANGES
+              }
+
+            }
+
+            continue TAG_LOOP;
+          }
+        }
+
+        static if(containsFlag!(SdlReflection.noSingularTags, memberAttributes) ) {
+          mixin(debugSdlReflection(T.stringof, memberString, "does not handle singular tags", true));
+        } else {
+          static if(singularName!(T, memberString) is null) {
+            static assert(0, format("Could not determine the singular name for %s.%s because it does not end with an 's'.  Use @(SdlSingularName(\"name\") to specify one.",
+                                    T.stringof, memberString));
+          }
+
+          mixin(debugSdlReflection(T.stringof, memberString, format("handles singular tags named '%s'", singularName!(T, memberString)), true));
+
+
+          if(tag.name == singularName!(T, memberString)) {
+
+            tag.enforceNoAttributes();
+            tag.enforceNoChildren();
+
+            static if( isArray!(memberElementType) &&
+                       !isSomeString!(memberElementType) ) {
+
+              implement("singular list of arrays");
+
+            } else static if( isAssociativeArray!(memberElementType)) {
+
+              implement("singular list of assoc-arrays");
+
+            } else static if( is ( isNested!(memberType) ) ) {
+
+              implement("singular list of functions/structs/classes");
+
+            } else {
+
+              static if ( isAppender ) {
+                AppenderElementType!(memberType) value;
+              } else {
+                memberElementType value;
+              }
+
+              tag.getOneValue(value);
+              __traits(getMember, obj, memberString) ~= value;
+              debug writefln("[DEBUG] parseSdlInto: %s.%s was appended with '%s'", T.stringof, memberString, __traits(getMember, obj, memberString));
+              continue TAG_LOOP;
+
+            }
+
+          }
+
+        }
+
+        // END OF HANDLING OUTPUT RANGES
 
       } else static if( isAssociativeArray!(memberType)) {
 
-	mixin(debugSdlReflection(T.stringof, memberString, "deserialized as an associative array"));
-	implement("associative arrays");
+        mixin(debugSdlReflection(T.stringof, memberString, "deserialized as an associative array"));
+        implement("associative arrays");
 
       } else static if( is (isNested!(memberType))) {
 
-	mixin(debugSdlReflection(T.stringof, memberString, "deserialized as an object"));
-	implement("sub function/struct/class");
+        mixin(debugSdlReflection(T.stringof, memberString, "deserialized as an object"));
+        implement("sub function/struct/class");
 
       } else {
 
-	mixin(debugSdlReflection(T.stringof, memberString, "deserialized as a single value"));
-	
-	if(tag.name == memberString) {
-	  tag.enforceNoAttributes();
-	  tag.enforceNoChildren();
-	  tag.getOneValue(__traits(getMember, obj, memberString));
-	  debug writefln("[DEBUG] parseSdlInto: set %s.%s to '%s'", T.stringof, memberString, __traits(getMember, obj, memberString));
-	  continue TAG_LOOP;
-	}
+        mixin(debugSdlReflection(T.stringof, memberString, "deserialized as a single value"));
+
+        if(tag.name == memberString) {
+          tag.enforceNoAttributes();
+          tag.enforceNoChildren();
+          tag.getOneValue(__traits(getMember, obj, memberString));
+          debug writefln("[DEBUG] parseSdlInto: set %s.%s to '%s'", T.stringof, memberString, __traits(getMember, obj, memberString));
+          continue TAG_LOOP;
+        }
 
 
       }
@@ -429,7 +429,7 @@ version(unittest_sdlreflection) unittest
     T parsedType;
 
     try {
-      
+
       parseSdlInto!T(parsedType, setupSdlText(sdlText, copySdl));
 
     } catch(Exception e) {
@@ -452,7 +452,7 @@ version(unittest_sdlreflection) unittest
     auto values = appender!(int[])();
     this(int[] values...) {
       foreach(value; values) {
-	this.values.put(value);
+        this.values.put(value);
       }
     }
   }
@@ -482,14 +482,14 @@ value 13
     @(SdlReflection.noSingularTags)
     string[] sourceFiles;
 
-        
+
     @(SdlSingularName("dependency"))
     string[string][] dependencies;
 
     @(SdlReflection.onlySingularTags)
     @(SdlSingularName("a-float"))
     float[] myFloats;
-        
+
 
 
     void reset() {
@@ -521,7 +521,7 @@ randomUints 1 2 3 4
 randomUint 1
 randomUints 2 3 4 5
 randomUints {
-  99 8291 
+  99 8291
   83992
 }
 randomUint 9983`, PackageInfo(null, null, null, 0, [1,2,3,4,5,99,8291,83992,9983]));

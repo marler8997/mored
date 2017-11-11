@@ -78,8 +78,8 @@ struct RepoSet
   bool pathBelongsToKnownRepo(string path, ref Repo foundRepo) {
     foreach(repo; repos.data) {
       if(repo.contains(path)) {
-	foundRepo = repo;
-	return true;
+        foundRepo = repo;
+        return true;
       }
     }
     return false;

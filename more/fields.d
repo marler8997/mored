@@ -37,12 +37,12 @@ struct Text
   void setup(const(char)[] chars) {
     this.lineNumber = 1;
     this.column = 1;
-    
+
     this.chars = chars;
     this.limit = chars.ptr + chars.length;
     this.cpos = chars.ptr;
     this.next = chars.ptr;
-    
+
     if(chars.length > 0) {
       c = decodeUtf8(this.next, this.limit);
     }
@@ -62,11 +62,11 @@ struct Text
   {
     while(true) {
       if(next >= limit) break;
-      c = decodeUtf8(next, limit); 
+      c = decodeUtf8(next, limit);
       if(c == '\n') {
-	lineNumber++;
-	column = 1;
-	break;
+        lineNumber++;
+        column = 1;
+        break;
       }
     }
     cpos = next;
@@ -79,10 +79,10 @@ struct Text
     while(true) {
       cpos = next;
       if(next >= limit) break;
-      c = decodeUtf8(next, limit); 
+      c = decodeUtf8(next, limit);
       column++;
       if(c == '\n') {
-	break;
+        break;
       }
     }
   }
@@ -93,27 +93,27 @@ struct Text
     } else {
 
       while(true) {
-	cpos = next;
-	if(next >= limit) break;
-	c = decodeUtf8(next, limit); 
-	column++;
-	if(isControlChar(c)) {
+        cpos = next;
+        if(next >= limit) break;
+        c = decodeUtf8(next, limit);
+        column++;
+        if(isControlChar(c)) {
 
-	  // Handle slashes that aren't comments
-	  if(c != '/') break;
-	  if(next >= limit) {
-	    cpos = next;
-	    break;
-	  }
-	  auto saveNext = next;
-	  c = decodeUtf8(next, limit);
-	  next = saveNext;
-	  
-	  if(c == '*' || c == '/') {
-	    break;
-	  }
+          // Handle slashes that aren't comments
+          if(c != '/') break;
+          if(next >= limit) {
+            cpos = next;
+            break;
+          }
+          auto saveNext = next;
+          c = decodeUtf8(next, limit);
+          next = saveNext;
 
-	}
+          if(c == '*' || c == '/') {
+            break;
+          }
+
+        }
 
       }
     }
@@ -127,82 +127,82 @@ struct Text
       // TODO: maybe use a lookup table here
       if(c == ' ' || c == '\t' || c =='\v' || c == '\f' || c == '\r') {
 
-	// do nothing (check first as this is the most likely case)
+        // do nothing (check first as this is the most likely case)
 
       } else if(c == '\n') {
 
-	if(!skipNewlines) return;
+        if(!skipNewlines) return;
 
-	lineNumber++;
-	column = 1;
+        lineNumber++;
+        column = 1;
 
       } else if(c == '#') {
 
-	if(!skipNewlines) {
-	  toNewline();
-	  return;
-	}
+        if(!skipNewlines) {
+          toNewline();
+          return;
+        }
 
-	toNextLine();
+        toNextLine();
 
       } else if(c == '/') {
 
-	if(next >= limit) return;
+        if(next >= limit) return;
 
-	c = decodeUtf8(next, limit);
-	
-	if(c == '/') {
+        c = decodeUtf8(next, limit);
 
-	  if(!skipNewlines) {
-	    toNewline();
-	    return;
-	  }
+        if(c == '/') {
 
-	  toNextLine();
+          if(!skipNewlines) {
+            toNewline();
+            return;
+          }
 
-	} else if(c == '*') {
+          toNextLine();
 
-	  if(!skipNewlines) {
-	    implement("multiline comments when not skipping newlines");
-	  }
+        } else if(c == '*') {
 
-	  
-	  column++;
+          if(!skipNewlines) {
+            implement("multiline comments when not skipping newlines");
+          }
 
-	MULTILINE_COMMENT_LOOP:
-	  while(next < limit) {
 
-	    c = decodeUtf8(next, limit); // no need to save cpos since c will be thrown away
-	    column++;
+          column++;
 
-	    if(c == '\n') {
-	      lineNumber++;
-	      column = 0;
-	      lineNumber++;
-	    } else if(c == '*') {
-	      // loop assume c is pointing to a '*' and next is pointing to the next characer
-	      while(next < limit) {
+        MULTILINE_COMMENT_LOOP:
+          while(next < limit) {
 
-		c = decodeUtf8(next, limit);
-		column++;
-		if(c == '/') break MULTILINE_COMMENT_LOOP;
-		if(c == '\n') {
-		  lineNumber++;
-		  column = 0;
-		} else if(c != '*') {
-		  break;
-		}
-	      }
-	    }
-	  }
+            c = decodeUtf8(next, limit); // no need to save cpos since c will be thrown away
+            column++;
 
-	} else {
-	  return;
-	}
+            if(c == '\n') {
+              lineNumber++;
+              column = 0;
+              lineNumber++;
+            } else if(c == '*') {
+              // loop assume c is pointing to a '*' and next is pointing to the next characer
+              while(next < limit) {
+
+                c = decodeUtf8(next, limit);
+                column++;
+                if(c == '/') break MULTILINE_COMMENT_LOOP;
+                if(c == '\n') {
+                  lineNumber++;
+                  column = 0;
+                } else if(c != '*') {
+                  break;
+                }
+              }
+            }
+          }
+
+        } else {
+          return;
+        }
 
       } else {
 
-	return; // Found non-whitespace and non-comment
+        return; // Found non-whitespace and non-comment
 
       }
 
@@ -224,10 +224,10 @@ struct Text
       token.lineNumber = lineNumber;
       token.column = column;
     } else {
-      
+
       if(isControlChar(c)) {
-	throw new TextParseException(format("Expected non-control character but got '%s' (charcode=%s)",
-					    c, cast(uint)c));
+        throw new TextParseException(format("Expected non-control character but got '%s' (charcode=%s)",
+                                            c, cast(uint)c));
       }
 
       const(char)* startOfToken = cpos;
@@ -327,11 +327,11 @@ void parseField(ref FieldToken token, ref Text text)
     // no need to save cpos since c will be thrown away
     while(true) {
       if(next >= limit) break;
-      c = decodeUtf8(next, limit); 
+      c = decodeUtf8(next, limit);
       if(c == '\n') {
-	text.lineNumber++;
-	text.column = 1;
-	break;
+        text.lineNumber++;
+        text.column = 1;
+        break;
       }
     }
     cpos = next;
@@ -350,13 +350,13 @@ void parseField(ref FieldToken token, ref Text text)
     } else {
 
       while(true) {
-	cpos = next;
-	if(next >= limit) break;
-	c = decodeUtf8(next, limit); 
-	text.column++;
-	if(isControlChar(c)) {
-	  break;
-	}
+        cpos = next;
+        if(next >= limit) break;
+        c = decodeUtf8(next, limit);
+        text.column++;
+        if(isControlChar(c)) {
+          break;
+        }
       }
     }
   }
@@ -371,65 +371,65 @@ void parseField(ref FieldToken token, ref Text text)
       // TODO: maybe use a lookup table here
       if(c == ' ' || c == '\t' || c =='\v' || c == '\f' || c == '\r') {
 
-	// do nothing (check first as this is the most likely case)
+        // do nothing (check first as this is the most likely case)
 
       } else if(c == '\n') {
 
-	text.lineNumber++;
-	text.column = 1;
+        text.lineNumber++;
+        text.column = 1;
 
       } else if(c == '#') {
 
-	toNextLine();
+        toNextLine();
 
       } else if(c == '/') {
 
-	if(next >= limit) return;
+        if(next >= limit) return;
 
-	c = decodeUtf8(next, limit);
-	
-	if(c == '/') {
+        c = decodeUtf8(next, limit);
 
-	  toNextLine();
+        if(c == '/') {
 
-	} else if(c == '*') {
-	  
-	  text.column++;
+          toNextLine();
 
-	MULTILINE_COMMENT_LOOP:
-	  while(next < limit) {
+        } else if(c == '*') {
 
-	    c = decodeUtf8(next, limit); // no need to save cpos since c will be thrown away
-	    text.column++;
+          text.column++;
 
-	    if(c == '\n') {
-	      text.lineNumber++;
-	      text.column = 0;
-	      text.lineNumber++;
-	    } else if(c == '*') {
-	      // loop assume c is pointing to a '*' and next is pointing to the next characer
-	      while(next < limit) {
+        MULTILINE_COMMENT_LOOP:
+          while(next < limit) {
 
-		c = decodeUtf8(next, limit);
-		text.column++;
-		if(c == '/') break MULTILINE_COMMENT_LOOP;
-		if(c == '\n') {
-		  text.lineNumber++;
-		  text.column = 0;
-		} else if(c != '*') {
-		  break;
-		}
-	      }
-	    }
-	  }
+            c = decodeUtf8(next, limit); // no need to save cpos since c will be thrown away
+            text.column++;
 
-	} else {
-	  return;
-	}
+            if(c == '\n') {
+              text.lineNumber++;
+              text.column = 0;
+              text.lineNumber++;
+            } else if(c == '*') {
+              // loop assume c is pointing to a '*' and next is pointing to the next characer
+              while(next < limit) {
+
+                c = decodeUtf8(next, limit);
+                text.column++;
+                if(c == '/') break MULTILINE_COMMENT_LOOP;
+                if(c == '\n') {
+                  text.lineNumber++;
+                  text.column = 0;
+                } else if(c != '*') {
+                  break;
+                }
+              }
+            }
+          }
+
+        } else {
+          return;
+        }
 
       } else {
 
-	return; // Found non-whitespace and non-comment
+        return; // Found non-whitespace and non-comment
 
       }
 
@@ -483,32 +483,32 @@ bool isWhitespace(dchar c) {
 mixin("private __gshared immutable ubyte[256] charLookup = "~rangeInitializers
       (
        /*
-	 "'_'"    , "sdlIDFlag",
+         "'_'"    , "sdlIDFlag",
 
-	 `'a'`    , "sdlIDFlag",
-	 `'b'`    , "sdlIDFlag | sdlNumberFlag | sdlNumberPostfixFlag",
-	 `'c'`    , "sdlIDFlag",
-	 `'d'`    , "sdlIDFlag | sdlNumberFlag | sdlNumberPostfixFlag",
-	 `'e'`    , "sdlIDFlag",
-	 `'f'`    , "sdlIDFlag | sdlNumberFlag | sdlNumberPostfixFlag",
-	 `'g'-'k'`, "sdlIDFlag",
-	 `'l'`    , "sdlIDFlag | sdlNumberFlag | sdlNumberPostfixFlag",
-	 `'m'-'z'`, "sdlIDFlag",
+         `'a'`    , "sdlIDFlag",
+         `'b'`    , "sdlIDFlag | sdlNumberFlag | sdlNumberPostfixFlag",
+         `'c'`    , "sdlIDFlag",
+         `'d'`    , "sdlIDFlag | sdlNumberFlag | sdlNumberPostfixFlag",
+         `'e'`    , "sdlIDFlag",
+         `'f'`    , "sdlIDFlag | sdlNumberFlag | sdlNumberPostfixFlag",
+         `'g'-'k'`, "sdlIDFlag",
+         `'l'`    , "sdlIDFlag | sdlNumberFlag | sdlNumberPostfixFlag",
+         `'m'-'z'`, "sdlIDFlag",
 
-	 `'A'`    , "sdlIDFlag",
-	 `'B'`    , "sdlIDFlag | sdlNumberFlag | sdlNumberPostfixFlag",
-	 `'C'`    , "sdlIDFlag",
-	 `'D'`    , "sdlIDFlag | sdlNumberFlag | sdlNumberPostfixFlag",
-	 `'E'`    , "sdlIDFlag",
-	 `'F'`    , "sdlIDFlag | sdlNumberFlag | sdlNumberPostfixFlag",
-	 `'G'-'K'`, "sdlIDFlag",
-	 `'L'`    , "sdlIDFlag | sdlNumberFlag | sdlNumberPostfixFlag",
-	 `'M'-'Z'`, "sdlIDFlag",
+         `'A'`    , "sdlIDFlag",
+         `'B'`    , "sdlIDFlag | sdlNumberFlag | sdlNumberPostfixFlag",
+         `'C'`    , "sdlIDFlag",
+         `'D'`    , "sdlIDFlag | sdlNumberFlag | sdlNumberPostfixFlag",
+         `'E'`    , "sdlIDFlag",
+         `'F'`    , "sdlIDFlag | sdlNumberFlag | sdlNumberPostfixFlag",
+         `'G'-'K'`, "sdlIDFlag",
+         `'L'`    , "sdlIDFlag | sdlNumberFlag | sdlNumberPostfixFlag",
+         `'M'-'Z'`, "sdlIDFlag",
 
-	 `'0'-'9'`, "sdlIDFlag | sdlNumberFlag",
-	 `'-'`    , "sdlIDFlag",
-	 `'.'`    , "sdlIDFlag | sdlNumberFlag",
-	 `'$'`    , "sdlIDFlag",
+         `'0'-'9'`, "sdlIDFlag | sdlNumberFlag",
+         `'-'`    , "sdlIDFlag",
+         `'.'`    , "sdlIDFlag | sdlNumberFlag",
+         `'$'`    , "sdlIDFlag",
        */
        `' '`    , "controlCharFlag | whitespaceFlag",
        `'\t'`   , "controlCharFlag | whitespaceFlag",
@@ -518,7 +518,7 @@ mixin("private __gshared immutable ubyte[256] charLookup = "~rangeInitializers
        `'\r'`   , "controlCharFlag | whitespaceFlag",
        `'{'`    , "controlCharFlag",
        `'}'`    , "controlCharFlag",
-       
+
        `'['`    , "controlCharFlag",
        `']'`    , "controlCharFlag",
        //`';'`    , "controlCharFlag",
@@ -549,30 +549,30 @@ version(unittest_fields) unittest
 
       for(auto i = 0; i < expectedTokens.length; i++) {
 
-	//parseField(token, text);
-	text.parseField(token);
-	if(token.eof) {
-	  writefln("Expected %s token(s) but only got %s", expectedTokens.length, i);
-	  writefln("Error: test on line %s", testLine);
-	}
+        //parseField(token, text);
+        text.parseField(token);
+        if(token.eof) {
+          writefln("Expected %s token(s) but only got %s", expectedTokens.length, i);
+          writefln("Error: test on line %s", testLine);
+        }
 
-	auto expectedToken = expectedTokens[i];
-	if(token.text != expectedToken.text) {
-	  writefln("Error: expected token '%s' but got '%s'", expectedToken.text, token.text);
-	  writefln("Error: test on line %s", testLine);
-	  assert(0);
-	}
+        auto expectedToken = expectedTokens[i];
+        if(token.text != expectedToken.text) {
+          writefln("Error: expected token '%s' but got '%s'", expectedToken.text, token.text);
+          writefln("Error: test on line %s", testLine);
+          assert(0);
+        }
       }
 
       //parseField(token, text);
       text.parseField(token);
       if(!token.eof) {
-	writefln("Expected %s token(s) but got at least one more (text='%s')",
-		 expectedTokens.length, token.text);
-	writefln("Error: test on line %s", testLine);
-	assert(0);
+        writefln("Expected %s token(s) but got at least one more (text='%s')",
+                 expectedTokens.length, token.text);
+        writefln("Error: test on line %s", testLine);
+        assert(0);
       }
-      
+
     } catch(Exception e) {
       writefln("[TEST] this sdl threw an unexpected Exception: '%s'", escape(text.chars));
       writeln(e);
