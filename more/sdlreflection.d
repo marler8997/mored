@@ -38,6 +38,7 @@ import std.typecons;
 import std.traits;
 import std.range;
 import std.array;
+import std.meta : AliasSeq;
 
 import more.common;
 import more.sdl;
@@ -175,7 +176,7 @@ void parseSdlInto(T)(ref T obj, ref SdlWalker walker, char[] sdl, size_t depth) 
 
       //writefln("[DEBUG] tag '%s' checking member '%s %s'", tag.name, memberType.stringof, memberString);
 
-      alias TypeTuple!(__traits(getAttributes, T.tupleof[memberIndex])) memberAttributes;
+      alias AliasSeq!(__traits(getAttributes, T.tupleof[memberIndex])) memberAttributes;
       alias ElementType!(memberType) memberElementType;
       enum isAppender = is( memberType == Appender!(AppenderElementType!(memberType)[]));
 

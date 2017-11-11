@@ -109,14 +109,14 @@
 
 module more.sdl;
 
+import core.stdc.string : memmove;
+
 import std.array;
 import std.string;
 import std.range;
 import std.conv;
 import std.bitmanip;
 import std.traits;
-
-import std.c.string: memmove;
 
 import more.common;
 import more.utf8;
@@ -126,6 +126,7 @@ version(unittest_sdl)
   import std.stdio;
 }
 
+alias LineNumber = size_t;
 
 /// Used in SdlParseException to distinguish specific sdl parse errors.
 enum SdlErrorType {
@@ -137,11 +138,11 @@ enum SdlErrorType {
 class SdlParseException : Exception
 {
   SdlErrorType type;
-  uint lineInSdl;
-  this(uint lineInSdl, string msg, string file = __FILE__, size_t codeLine = __LINE__) {
+  LineNumber lineInSdl;
+  this(LineNumber lineInSdl, string msg, string file = __FILE__, size_t codeLine = __LINE__) {
     this(SdlErrorType.unknown, lineInSdl, msg, file, codeLine);
   }
-  this(SdlErrorType errorType, uint lineInSdl, string msg, string file = __FILE__, size_t codeLine = __LINE__) {
+  this(SdlErrorType errorType, LineNumber lineInSdl, string msg, string file = __FILE__, size_t codeLine = __LINE__) {
     super((lineInSdl == 0) ? msg : "line "~to!string(lineInSdl)~": "~msg, file, codeLine);
     this.type = errorType;
     this.lineInSdl = lineInSdl;
@@ -756,7 +757,7 @@ bool parseSdlTag(Tag* tag, char[]* sdlText)
   void readNext()
   {
     cpos = next;
-    c = decodeUtf8(next, limit);
+    c = decodeUtf8(&next, limit);
   }
 
   bool isIDStart() {
@@ -805,7 +806,7 @@ bool parseSdlTag(Tag* tag, char[]* sdlText)
   {
     while(true) {
       if(next >= limit) { return; }
-      c = decodeUtf8(next, limit); // no need to save cpos since c will be thrown away
+      c = decodeUtf8(&next, limit); // no need to save cpos since c will be thrown away
       if(c == '\n') { tag.line++; return; }
     }
   }
@@ -848,7 +849,7 @@ bool parseSdlTag(Tag* tag, char[]* sdlText)
   //   c/cpos: points to the first character after all the whitespace/comments
   bool skipWhitespaceAndComments()
   {
-    uint lineBefore = tag.line;
+    LineNumber lineBefore = tag.line;
 
     while(true) {
 
@@ -869,7 +870,7 @@ bool parseSdlTag(Tag* tag, char[]* sdlText)
 
 	if(next >= limit) return tag.line > lineBefore;
 
-	dchar secondChar = decodeUtf8(next, limit);
+	dchar secondChar = decodeUtf8(&next, limit);
 
 	if(secondChar == c) { // '--' or '//'
 
@@ -880,14 +881,14 @@ bool parseSdlTag(Tag* tag, char[]* sdlText)
 	MULTILINE_COMMENT_LOOP:
 	  while(next < limit) {
 
-	    c = decodeUtf8(next, limit); // no need to save cpos since c will be thrown away
+	    c = decodeUtf8(&next, limit); // no need to save cpos since c will be thrown away
 	    if(c == '\n') {
 	      tag.line++;
 	    } else if(c == '*') {
 	      // loop assume c is pointing to a '*' and next is pointing to the next characer
 	      while(next < limit) {
 
-		c = decodeUtf8(next, limit);
+		c = decodeUtf8(&next, limit);
 		if(c == '/') break MULTILINE_COMMENT_LOOP;
 		if(c == '\n') {
 		  tag.line++;
@@ -941,7 +942,7 @@ bool parseSdlTag(Tag* tag, char[]* sdlText)
 	while(true) {
 	  cpos = next;
 	  if(next >= limit) { token = start[0..next-start]; return; }
-	  c = decodeUtf8(next, limit);
+	  c = decodeUtf8(&next, limit);
 	  if(!isID()) break;
 	}
       }
@@ -954,7 +955,7 @@ bool parseSdlTag(Tag* tag, char[]* sdlText)
                                                // and no namespace
 	cpos = next;
 	if(next >= limit) { token.length = 0; return; }
-	c = decodeUtf8(next, limit);
+	c = decodeUtf8(&next, limit);
 
 	if(!isIDStart()) {
 	  if(atFirstToken) {
@@ -970,7 +971,7 @@ bool parseSdlTag(Tag* tag, char[]* sdlText)
 	while(true) {
 	  cpos = next;
 	  if(next >= limit) { token = start[0..next-start]; return; }
-	  c = decodeUtf8(next, limit);
+	  c = decodeUtf8(&next, limit);
 	  if(!isID()) break;
 	}
 	
@@ -989,7 +990,7 @@ bool parseSdlTag(Tag* tag, char[]* sdlText)
       if(next >= limit) throw new SdlParseException
 			  (tag.line, format("sdl cannot end with '=' character"));
       cpos = next;
-      c = decodeUtf8(next, limit);
+      c = decodeUtf8(&next, limit);
     }
 
 
@@ -1001,7 +1002,7 @@ bool parseSdlTag(Tag* tag, char[]* sdlText)
       while(true) {
 	cpos = next;
 	if(next >= limit) { token = start[0..next-start]; return; }
-	c = decodeUtf8(next, limit);
+	c = decodeUtf8(&next, limit);
 	if(!isID()) break;
       }
 
@@ -1021,13 +1022,13 @@ bool parseSdlTag(Tag* tag, char[]* sdlText)
       while(true) {
 
 	if(next >= limit) throw new SdlParseException(tag.line, noEndingQuote);
-	c = decodeUtf8(next, limit); // no need to save cpos since c will be thrown away
+	c = decodeUtf8(&next, limit); // no need to save cpos since c will be thrown away
 	if(c == '"') break;
 	if(c == '\\') {
 	  containsEscapes = true;
 	  if(next >= limit) throw new SdlParseException(tag.line, noEndingQuote);
 	  // NOTE TODO: remember to handle escaped newlines
-	  c = decodeUtf8(next, limit);
+	  c = decodeUtf8(&next, limit);
 	} else if(c == '\n') {
 	  throw new SdlParseException(tag.line, noEndingQuote);
 	}
@@ -1044,7 +1045,7 @@ bool parseSdlTag(Tag* tag, char[]* sdlText)
       }
 
       cpos = next;
-      if( next < limit) c = decodeUtf8(next, limit);
+      if( next < limit) c = decodeUtf8(&next, limit);
 
     } else if(c == '`') {
 
@@ -1057,7 +1058,7 @@ bool parseSdlTag(Tag* tag, char[]* sdlText)
       while(true) {
 	cpos = next;
 	if(next >= limit) { token = start[0..cpos-start]; break; }
-	c = decodeUtf8(next, limit);
+	c = decodeUtf8(&next, limit);
 	if(!isNumber()) { token = start[0..cpos-start]; break; }
 
 	//if(tag.rejectTypedNumbers && isNumberPostfix())
@@ -1132,7 +1133,7 @@ bool parseSdlTag(Tag* tag, char[]* sdlText)
       // Read the next character
       if(next >= limit) { enforceNoMoreTags(); goto RETURN_NO_TAG; }
       cpos = next;
-      c = decodeUtf8(next, limit);
+      c = decodeUtf8(&next, limit);
 
       continue;
 
@@ -1193,7 +1194,7 @@ bool parseSdlTag(Tag* tag, char[]* sdlText)
       //
       if(c == '\\') {
 	if(next >= limit) goto RETURN_TAG; // (check to make sure ending an sdl file with a backslash is ok)
-	c = decodeUtf8(next, limit);
+	c = decodeUtf8(&next, limit);
 
 	foundNewline = skipWhitespaceAndComments();
 	if(cpos >= limit) goto RETURN_TAG;
@@ -2119,7 +2120,7 @@ version(unittest_sdl) unittest
       name = null;
       age = 0;
       nicknames = null;
-      children.clear();
+      children.length = 0;
     }
     bool opEquals(ref const Person p) {
       return

@@ -7,6 +7,7 @@ import std.stdio;
 import std.string;
 import std.bitmanip;
 import std.format;
+import std.traits : Unqual;
 
 import core.exception;
 
