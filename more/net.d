@@ -292,7 +292,7 @@ else version(Posix)
     {
       close(sock);
     }
-    extern(C) sysresult_t bind(T)(socket_t sock, const(sockaddr)* addr, uint addrlen);
+    extern(C) sysresult_t bind(socket_t sock, const(sockaddr)* addr, uint addrlen);
     extern(C) sysresult_t listen(socket_t sock, uint backlog);
     extern(C) socket_t accept(socket_t sock,  const(sockaddr)* addr, socklen_t* addrlen);
     extern(C) ptrdiff_t recv(socket_t sock, ubyte* buffer, size_t len, uint flags);
@@ -306,9 +306,12 @@ else
     static assert(0, "unhandled platform");
 }
 
-private immutable typeof(&core.sys.windows.winsock2.getnameinfo) getnameinfoPointer;
-private immutable typeof(&core.sys.windows.winsock2.getaddrinfo) getaddrinfoPointer;
-private immutable typeof(&core.sys.windows.winsock2.freeaddrinfo) freeaddrinfoPointer;
+version(Windows)
+{
+    private immutable typeof(&core.sys.windows.winsock2.getnameinfo) getnameinfoPointer;
+    private immutable typeof(&core.sys.windows.winsock2.getaddrinfo) getaddrinfoPointer;
+    private immutable typeof(&core.sys.windows.winsock2.freeaddrinfo) freeaddrinfoPointer;
+}
 
 shared static this() @system
 {
@@ -423,6 +426,22 @@ struct sockaddr_in
     {
         char[] sin_zero;
     }
+    bool equals(ref const(sockaddr_in) other) const
+    {
+        return sin_port == other.sin_port &&
+            sin_addr.s_addr == other.sin_addr.s_addr;
+    }
+    void toString(scope void delegate(const(char)[]) sink) const
+    {
+        assert(sin_family == AddressFamily.inet);
+        auto addr = ntohl(sin_addr.s_addr);
+        formattedWrite(sink, "%s.%s.%s.%s:%s",
+                      (addr >> 24),
+                      (addr >> 16) & 0xFF,
+                      (addr >>  8) & 0xFF,
+                      (addr >>  0) & 0xFF,
+                      ntohs(sin_port));
+    }
 }
 struct sockaddr_in6
 {
@@ -462,13 +481,7 @@ union inet_sockaddr
     {
         if(family == AddressFamily.inet)
         {
-            auto addr = ntohl(ipv4.sin_addr.s_addr);
-            formattedWrite(sink, "%s.%s.%s.%s:%s",
-                          (addr >> 24),
-                          (addr >> 16) & 0xFF,
-                          (addr >>  8) & 0xFF,
-                          (addr >>  0) & 0xFF,
-                          ntohs(in_port));
+            ipv4.toString(sink);
         }
         else if(family == AddressFamily.inet6)
         {
@@ -504,19 +517,19 @@ union inet_sockaddr
 
 pragma(inline)
 sysresult_t bind(T)(socket_t sock, const(T)* addr)
-    if( is(T == inet_sockaddr) /* add more types */ )
+    if( is(T == inet_sockaddr) || is(T == sockaddr_in) /* add more types */ )
 {
     return bind(sock, cast(sockaddr*)addr, T.sizeof);
 }
 pragma(inline)
 sysresult_t connect(T)(socket_t sock, const(T)* addr)
-    if( is(T == inet_sockaddr) /* add more types */ )
+    if( is(T == inet_sockaddr) || is(T == sockaddr_in) /* add more types */ )
 {
     return connect(sock, cast(sockaddr*)addr, T.sizeof);
 }
 pragma(inline)
 socket_t accept(T)(socket_t sock, T* addr)
-    if( is(T == inet_sockaddr) /* add more types */ )
+    if( is(T == inet_sockaddr) || is(T == sockaddr_in) /* add more types */ )
 {
     socklen_t fromlen = T.sizeof;
     return accept(sock, cast(sockaddr*)addr, &fromlen);
@@ -547,16 +560,16 @@ auto recv(T)(socket_t sock, T[] buffer, uint flags = 0)
 }
 pragma(inline)
 auto recvfrom(T,U)(socket_t sock, T[] buffer, uint flags, U* from)
-    if(T.sizeof == 1 && is(U == inet_sockaddr) /* add more types */ )
+    if(T.sizeof == 1 && is(U == inet_sockaddr) || is(U == sockaddr_in) /* add more types */ )
 {
     uint fromlen = U.sizeof;
     return recvfrom(sock, cast(ubyte*)buffer.ptr, buffer.length, flags, cast(sockaddr*)from, &fromlen);
 }
 pragma(inline)
-auto sendto(T,U)(socket_t sock, const(T)[] buffer, uint flags, const(U)* from)
-    if(T.sizeof == 1 && is(U == inet_sockaddr) /* add more types */ )
+auto sendto(T,U)(socket_t sock, const(T)[] buffer, uint flags, const(U)* to)
+    if(T.sizeof == 1 && is(U == inet_sockaddr) || is(U == sockaddr_in) /* add more types */ )
 {
-    return sendto(sock, cast(const(ubyte)*)buffer.ptr, buffer.length, flags, cast(const(sockaddr)*)from, U.sizeof);
+    return sendto(sock, cast(const(ubyte)*)buffer.ptr, buffer.length, flags, cast(const(sockaddr)*)to, U.sizeof);
 }
 
 alias Blocking = Flag!"blocking";
