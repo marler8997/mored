@@ -105,12 +105,9 @@ version(Windows)
     private immutable int _SOCKET_ERROR = core.sys.windows.winsock2.SOCKET_ERROR;
 
     alias socket_t = size_t;
+    enum invalidSocket = size_t.max;
     alias socklen_t = int;
     //enum socket_t : size_t;
-    bool isInvalid(socket_t sock)
-    {
-        return sock == size_t.max;
-    }
 
     alias sysresult_t = int;
     bool failed(sysresult_t result)
@@ -266,10 +263,7 @@ else version(Posix)
     private import core.stdc.errno;
 
     alias socket_t = int;
-    bool isInvalid(socket_t sock)
-    {
-        return sock == size_t.max;
-    }
+    enum invalidSocket = -1;
     alias socklen_t = int;
 
     enum Shutdown
@@ -360,6 +354,10 @@ shared static ~this() @system nothrow @nogc
 
 alias in_port_t = ushort;
 
+bool isInvalid(socket_t sock)
+{
+    return sock == invalidSocket;
+}
 T ntohs(T)(T value) if(T.sizeof == 2)
 {
     auto result = nativeToBigEndian(value);
