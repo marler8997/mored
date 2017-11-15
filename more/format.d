@@ -1,6 +1,12 @@
 module more.format;
 
-import std.typecons : Flag, Yes, No;
+/**
+Used for selecting either lower or upper case for certain kinds of formatting, such as hex.
+*/
+enum Case
+{
+    lower, upper
+}
 
 /**
 An alias to the common sink delegate used for string formatting.
@@ -54,15 +60,15 @@ void putf(R, U...)(R outputRange, string fmt, U args)
 /**
 Converts a 4-bit nibble to the corresponding hex character (0-9 or A-F).
 */
-char hexchar(Flag!"upperCase" upperCase = Yes.upperCase)(ubyte b) in { assert(b <= 0x0F); } body
+char hexchar(Case case_ = Case.lower)(ubyte b) in { assert(b <= 0x0F); } body
 {
-    static if(upperCase)
+    static if(case_ == Case.lower)
     {
-        return cast(char)(b + ((b <= 9) ? '0' : ('A'-10)));
+        return cast(char)(b + ((b <= 9) ? '0' : ('a'-10)));
     }
     else
     {
-        return cast(char)(b + ((b <= 9) ? '0' : ('a'-10)));
+        return cast(char)(b + ((b <= 9) ? '0' : ('A'-10)));
     }
 }
 unittest
@@ -71,8 +77,8 @@ unittest
     assert('9' == hexchar(0x9));
     assert('A' == hexchar(0xA));
     assert('F' == hexchar(0xF));
-    assert('a' == hexchar!(No.upperCase)(0xA));
-    assert('f' == hexchar!(No.upperCase)(0xF));
+    assert('a' == hexchar!(Case.upper)(0xA));
+    assert('f' == hexchar!(Case.upper)(0xF));
 }
 
 bool asciiIsUnreadable(char c) pure nothrow @nogc @safe
@@ -95,6 +101,43 @@ void asciiWriteUnreadable(scope void delegate(const(char)[]) sink, char c)
         buffer[3] = hexchar((cast(char)c)&0xF);
         sink(buffer);
     }
+}
+void asciiWriteEscaped(scope void delegate(const(char)[]) sink, const(char)* ptr, const char* limit)
+{
+    auto flushPtr = ptr;
+
+    void flush()
+    {
+        if(ptr > flushPtr)
+        {
+            sink(flushPtr[0..ptr-flushPtr]);
+            flushPtr = ptr;
+        }
+    }
+
+    for(; ptr < limit; ptr++)
+    {
+        auto c = *ptr;
+        if(asciiIsUnreadable(c))
+        {
+            flush();
+            sink.asciiWriteUnreadable(c);
+        }
+    }
+    flush();
+}
+auto asciiFormatEscaped(const(char)[] str)
+{
+    static struct Formatter
+    {
+        const(char)* str;
+        const(char)* limit;
+        void toString(scope void delegate(const(char)[]) sink) const
+        {
+            sink.asciiWriteEscaped(str, limit);
+        }
+    }
+    return Formatter(str.ptr, str.ptr + str.length);
 }
 
 bool utf8IsUnreadable(dchar c) pure nothrow @nogc @safe
@@ -141,7 +184,7 @@ void utf8WriteEscaped(scope void delegate(const(char)[]) sink, const(char)* ptr,
     for(; ptr < limit;)
     {
         const(char)* nextPtr = ptr;
-        dchar c = decodeUtf8(&nextPtr);
+        auto c = decodeUtf8(&nextPtr);
         if(utf8IsUnreadable(c))
         {
             flush();
@@ -181,4 +224,99 @@ auto utf8FormatEscaped(dchar c)
         }
     }
     return Formatter(c);
+}
+
+auto formatHex(Case case_ = Case.lower, T)(const(T)[] array) if(T.sizeof == 1)
+{
+    struct Formatter
+    {
+        const(T)[] array;
+        void toString(scope void delegate(const(char)[]) sink) const
+        {
+            char[2] chars;
+            foreach(value; array)
+            {
+                chars[0] = hexchar!case_((cast(char)value)>>4);
+                chars[1] = hexchar!case_((cast(char)value)&0xF);
+                sink(chars);
+            }
+        }
+    }
+    return Formatter(array);
+}
+
+// Policy-based formatEscape function
+auto formatEscapeByPolicy(Hooks)(const(char)[] str)
+{
+    struct Formatter
+    {
+        const(char)[] str;
+        void toString(scope void delegate(const(char)[]) sink) const
+        {
+            auto from = 0;
+            auto to = 0;
+            char[Hooks.escapeBufferLength] buffer;
+            Hooks.initEscapeBuffer(buffer.ptr);
+
+            for(; to < str.length; to++)
+            {
+                auto escapeLength = Hooks.escapeCheck(buffer.ptr, str[to]);
+                if(escapeLength > 0)
+                {
+                    if(to > from)
+                    {
+                        sink(str[from..to]);
+                    }
+                    sink(buffer[0..escapeLength]);
+                    from = to + 1;
+                }
+            }
+            if(to > from)
+            {
+                sink(str[from..to]);
+            }
+        }
+    }
+    return Formatter(str);
+}
+auto formatEscapeSet(string escapePrefix, string escapeSet)(const(char)[] str)
+{
+    static struct Hooks
+    {
+        enum escapeBufferLength = escapePrefix.length + 1;
+        static void initEscapeBuffer(char* escapeBuffer) pure
+        {
+            escapeBuffer[0..escapePrefix.length] = escapePrefix[];
+        }
+        static auto escapeCheck(char* escapeBuffer, char charToCheck) pure
+        {
+            foreach(escapeChar; escapeSet)
+            {
+                if(charToCheck == escapeChar)
+                {
+                    escapeBuffer[escapePrefix.length] = charToCheck;
+                    return escapePrefix.length + 1;
+                }
+            }
+            return 0; // char should not be escaped
+        }
+    }
+    return formatEscapeByPolicy!Hooks(str);
+}
+unittest
+{
+    import std.format : format;
+    assert(`` == format("%s", formatEscapeSet!(`\`, `\'`)(``)));
+    assert(`a` == format("%s", formatEscapeSet!(`\`, `\'`)(`a`)));
+    assert(`abcd` == format("%s", formatEscapeSet!(`\`, `\'`)(`abcd`)));
+
+    assert(`\'` == format("%s", formatEscapeSet!(`\`, `\'`)(`'`)));
+    assert(`\\` == format("%s", formatEscapeSet!(`\`, `\'`)(`\`)));
+    assert(`\'\\` == format("%s", formatEscapeSet!(`\`, `\'`)(`'\`)));
+    assert(`a\'\\` == format("%s", formatEscapeSet!(`\`, `\'`)(`a'\`)));
+    assert(`\'a\\` == format("%s", formatEscapeSet!(`\`, `\'`)(`'a\`)));
+    assert(`\'\\a` == format("%s", formatEscapeSet!(`\`, `\'`)(`'\a`)));
+    assert(`abcd\'\\` == format("%s", formatEscapeSet!(`\`, `\'`)(`abcd'\`)));
+    assert(`\'abcd\\` == format("%s", formatEscapeSet!(`\`, `\'`)(`'abcd\`)));
+    assert(`\'\\abcd` == format("%s", formatEscapeSet!(`\`, `\'`)(`'\abcd`)));
 }
