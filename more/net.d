@@ -110,11 +110,11 @@ version(Windows)
     //enum socket_t : size_t;
 
     alias sysresult_t = int;
-    bool failed(sysresult_t result)
+    @property bool failed(sysresult_t result)
     {
         return result != 0;
     }
-    bool success(sysresult_t result)
+    @property bool success(sysresult_t result)
     {
         return result == 0;
     }
@@ -230,11 +230,11 @@ version(Windows)
 else version(Posix)
 {
     alias sysresult_t = int;
-    bool failed(sysresult_t result)
+    @property bool failed(sysresult_t result)
     {
         return result != 0;
     }
-    bool success(sysresult_t result)
+    @property bool success(sysresult_t result)
     {
         return result == 0;
     }
