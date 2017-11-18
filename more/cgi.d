@@ -13,8 +13,10 @@ import std.typecons : tuple;
 import std.random : Random;
 import std.exception : ErrnoException;
 
+import more.parse : hexValue, findCharPtr;
 import more.format : formatEscapeByPolicy, formatEscapeSet, asciiFormatEscaped;
 public import more.format : formatHex;
+public import more.uri : uriDecode;
 
 void log(T...)(const(char)[] fmt, T args)
 {
@@ -223,7 +225,7 @@ version(Windows)
             auto front()
             {
                 auto pairString = range.front();
-                auto nameLimit = pairString.pair.ptr.findChar('=');
+                auto nameLimit = pairString.pair.ptr.findCharPtr('=');
                 auto nameLimitIndex = nameLimit - pairString.pair.ptr;
                 auto valueStartIndex = nameLimitIndex + ( (*nameLimit == '=') ? 1 : 0);
 
@@ -279,7 +281,7 @@ else
             auto front()
             {
                 auto pairString = range.front();
-                auto nameLimit = pairString.pair.findChar('=');
+                auto nameLimit = pairString.pair.findCharPtr('=');
                 auto nameLimitIndex = nameLimit - pairString.pair;
                 auto valueStart = nameLimit + ( (*nameLimit == '=') ? 1 : 0);
 
@@ -324,12 +326,12 @@ auto cookieRange(T)(T* cookieString)
             }
 
             auto namePtr = next;
-            auto valuePtr = findChar(next, '=');
+            auto valuePtr = findCharPtr(next, '=');
             cookie.name = namePtr[0..valuePtr - namePtr];
             trimRight(&cookie.name);
             if(*valuePtr == '=') {
                 valuePtr++;
-                next = findChar(next, ';');
+                next = findCharPtr(next, ';');
                 cookie.value = valuePtr[0..next - valuePtr];
                 trimRight(&cookie.value);
             } else {
@@ -368,12 +370,12 @@ auto queryVarsRange(T)(T* varZString)
                 var.name = null;
             } else {
                 auto namePtr = next;
-                auto valuePtr = findChar(next, '=');
+                auto valuePtr = findCharPtr(next, '=');
 
                 var.name = namePtr[0..valuePtr - namePtr];
                 if(*valuePtr == '=') {
                   valuePtr++;
-                  next = findChar(valuePtr, '&');
+                  next = findCharPtr(valuePtr, '&');
                   var.value = valuePtr[0..next - valuePtr];
                 } else {
                   var.value = valuePtr[0..0];
@@ -440,13 +442,13 @@ auto contentTypeArgRange(Char)(Char* contentTypeParams)
             if(*next == '\0') {
                 current.name = null;
             } else {
-                auto nameLimit = next.findChar('=');
+                auto nameLimit = next.findCharPtr('=');
                 current.name = next[0..nameLimit - next];
                 if(*nameLimit == '\0') {
                     current.value = nameLimit[0..0];
                 } else {
                     auto valueStart = nameLimit + 1;
-                    auto valueEnd = valueStart.findChar(';');
+                    auto valueEnd = valueStart.findCharPtr(';');
                     current.value = trimRight2(valueStart[0..valueEnd - valueStart]);
                 }
             }
@@ -479,13 +481,13 @@ auto httpHeaderArgRange(Char)(Char[] headerArgs)
             if(next == limit) {
                 current.name = null;
             } else {
-                auto nameLimit = next.findChar(limit, '=');
+                auto nameLimit = next.findCharPtr(limit, '=');
                 current.name = next[0..nameLimit - next];
                 if(nameLimit == limit) {
                     current.value = nameLimit[0..0];
                 } else {
                     auto valueStart = nameLimit + 1;
-                    auto valueEnd = valueStart.findChar(limit, ';');
+                    auto valueEnd = valueStart.findCharPtr(limit, ';');
                     current.value = trimRight2(valueStart[0..valueEnd - valueStart]);
                 }
             }
@@ -514,81 +516,6 @@ inout(char)[] trimRight2(inout(char)[] str)
 void trimRight(const(char)[]* str)
 {
     for(;(*str).length > 0 && (*str)[$-1] == ' '; (*str).length--) { }
-}
-
-inout(char)* skipCharSet(string charSet)(inout(char)* str)
-{
-  STR_LOOP:
-    for(;;)
-    {
-        auto c = *str;
-        foreach(charSetChar; charSet) {
-            if(c == charSetChar) {
-                str++;
-                continue STR_LOOP;
-            }
-        }
-        break;
-    }
-    return str;
-}
-inout(char)* skipCharSet(string charSet)(inout(char)* str, const(char)* limit)
-{
-  STR_LOOP:
-    for(;str < limit;)
-    {
-        auto c = *str;
-        foreach(charSetChar; charSet) {
-            if(c == charSetChar) {
-                str++;
-                continue STR_LOOP;
-            }
-        }
-        break;
-    }
-    return str;
-}
-
-inout(char)* skipSpace(inout(char)* str)
-{
-    for(;;str++)
-    {
-        if(*str != ' ') {
-            return str;
-        }
-    }
-}
-
-// returns index of c or '\0', whichever comes first
-inout(char)* findChar(char sentinal = '\0')(inout(char)* str, char c)
-{
-    for(;;str++) {
-        if(*str == c || *str == sentinal) {
-            return str;
-        }
-    }
-}
-inout(char)* findChar(inout(char)* str, const(char)* limit, char c)
-{
-    for(;;str++) {
-        if(str >= limit || *str == c) {
-           return str;
-        }
-    }
-}
-pragma(inline)
-inout(char)* findCharPtr(inout(char)[] str, char c)
-{
-    return findChar(str.ptr, str.ptr + str.length, c);
-}
-size_t findCharIndex(inout(char)[] str, char c)
-{
-    foreach(i, strChar; str) {
-        if(c == strChar) {
-            return i;
-        }
-    }
-    return str.length;
 }
 
 auto asUpper(T)(T c)
@@ -978,77 +905,6 @@ unittest
     assert(`\"\\abcd` == format("%s", formatJsonString(`"\abcd`)));
 }
 
-bool isValidUriChar(char c) pure
-{
-    if(c >= 'a') {
-        if(c <= 'z' || c == '~') {
-            return true;
-        }
-    } else if(c >= 'A') {
-        if(c <= 'Z' || c == '_') {
-            return true;
-        }
-    } else if(c >= '-') {
-        if(c <= '9' && c != '/') {
-            return true;
-        }
-    }
-    return false;
-}
-auto formatUriEncoded(const(char)[] str)
-{
-    static struct Hooks
-    {
-        enum escapeBufferLength = 3;
-        static void initEscapeBuffer(char* escapeBuffer) pure
-        {
-        }
-        static auto escapeCheck(char* escapeBuffer, char charToCheck) pure
-        {
-            if(charToCheck == ' ')
-            {
-                escapeBuffer[0] = '+';
-                return 1;
-            }
-            if(isValidUriChar(charToCheck))
-            {
-                return 0; // no need to escape
-            }
-            escapeBuffer[0] = '%';
-            escapeBuffer[1] = toHexUpper((cast(ubyte)charToCheck) >> 4);
-            escapeBuffer[2] = toHexUpper((cast(ubyte)charToCheck) & 0x0F);
-            return 3; // write a 3 character '%XX' escape sequence
-        }
-    }
-    return formatEscapeByPolicy!Hooks(str);
-}
-unittest
-{
-    assert(`` == format("%s", formatUriEncoded(``)));
-    assert(`a` == format("%s", formatUriEncoded(`a`)));
-    assert(`abcd` == format("%s", formatUriEncoded(`abcd`)));
-    assert(`abcd+efgh` == format("%s", formatUriEncoded(`abcd efgh`)));
-    assert(`%00%0A%21%2F` == format("%s", formatUriEncoded("\0\n!/")));
-    for(int i = char.min; i <= char.max; i++)
-    {
-        char[1] str;
-        str[0] = cast(char)i;
-
-        if(str[0] == ' ') {
-            assert("+" == format("%s", formatUriEncoded(str)));
-        } else if(isValidUriChar(str[0])) {
-            char[1] expected;
-            expected[0] = cast(char)i;
-            assert(expected == format("%s", formatUriEncoded(str)));
-        } else {
-            char[3] expected;
-            expected[0] = '%';
-            expected[1] = toHexUpper((cast(ubyte)i) >> 4);
-            expected[2] = toHexUpper((cast(ubyte)i) & 0x0F);
-            assert(expected == format("%s", formatUriEncoded(str)));
-        }
-    }
-}
 
 // returns the amount of characters that were parsed
 size_t parseHex(const(char)[] hex, ubyte[] bin)
@@ -1074,145 +930,6 @@ bool endsWith(T,U)(T[] str, U[] check)
 {
     return str.length >= check.length &&
         str[$ - check.length..$] == check[];
-}
-
-immutable hexTableLower = "0123456789abcdef";
-immutable hexTableUpper = "0123456789ABCDEF";
-char toHexLower(ubyte value) pure in { assert(value <= 0x0F); } body {
-    return hexTableLower[value];
-}
-char toHexUpper(ubyte value) pure in { assert(value <= 0x0F); } body {
-    return hexTableUpper[value];
-}
-
-// returns: ubyte.max on error
-ubyte hexValue(char c)
-{
-    if(c <= '9') {
-        return (c >= '0') ? cast(ubyte)(c - '0') : ubyte.max;
-    }
-    if(c >= 'a') {
-        return (c <= 'f') ? cast(ubyte)(c + 10 - 'a') : ubyte.max;
-    }
-    if(c >= 'A' && c <= 'F') {
-        return cast(ubyte)(c + 10 - 'A');
-    }
-    return ubyte.max;
-}
-unittest
-{
-    assert(ubyte.max == hexValue('/'));
-    assert(0 == hexValue('0'));
-    assert(9 == hexValue('9'));
-    assert(ubyte.max == hexValue(':'));
-
-    assert(ubyte.max == hexValue('@'));
-    assert(10 == hexValue('A'));
-    assert(15 == hexValue('F'));
-    assert(ubyte.max == hexValue('G'));
-
-    assert(ubyte.max == hexValue('`'));
-    assert(10 == hexValue('a'));
-    assert(15 == hexValue('f'));
-    assert(ubyte.max == hexValue('g'));
-
-    for(int cAsInt = char.min; cAsInt <= char.max; cAsInt++) {
-        char c = cast(char)cAsInt;
-        if(c >= '0' && c <= '9') {
-            assert(c - '0' == hexValue(c));
-        } else if(c >= 'a' && c <= 'f') {
-            assert(c + 10 - 'a' == hexValue(c));
-        } else if(c >= 'A' && c <= 'F') {
-            assert(c + 10 - 'A' == hexValue(c));
-        } else {
-            assert(ubyte.max == hexValue(c));
-        }
-    }
-}
-
-/**
- On success, returns a pointer to the terminating null character in
- the dst buffer.
-
- If the src buffer contains an invalid '%XX' sequence, this function will
- stop decoding at that point copy the invalid sequence (along with a terminating
- null) to the dst buffer and return a pointer to the start of the invalid sequence.
-*/
-char* uriDecode(const(char)* src, char* dst)
-{
-    //log("uriDecode before \"%s\"", src[0..strlen(src)]);
-    //auto saveDst = dst;
-    //scope(exit) log("uriDecode after  \"%s\"", saveDst[0..strlen(saveDst)]);
-    for(;;dst++) {
-        char c = *src;
-        src++;
-        if(c == '+') {
-            *dst = ' ';
-        } else if (c == '%') {
-            char[2] hexChars = void;
-            hexChars[0] = *src;
-            src++;
-
-            ubyte hexNibble1 = hexValue(hexChars[0]);
-            if(hexNibble1 == ubyte.max) {
-              dst[0..2] = (src - 1)[0..2];
-              dst[2] = '\0';
-              return dst;
-            }
-
-            hexChars[1] = *src;
-            src++;
-
-            ubyte hexNibble2 = hexValue(hexChars[1]);
-            if(hexNibble2 == ubyte.max) {
-              dst[0..3] = (src - 2)[0..3];
-              dst[3] = '\0';
-              return dst;
-            }
-
-            *dst = cast(char)(hexNibble1 << 4 | hexNibble2);
-
-        } else if (c == '\0') {
-            *dst = '\0';
-            return dst;
-        } else {
-            *dst = c;
-        }
-    }
-}
-unittest
-{
-    void test(const(char)[] before, const(char)[] expectedAfter)
-    {
-        assert(before[$-1] == '\0');
-        auto actualAfter = cast(char*)alloca(before.length);
-        auto result = uriDecode(before.ptr, actualAfter);
-        assert(actualAfter[0 .. (result + 1) - actualAfter] == expectedAfter);
-    }
-    test("\0", "\0");
-    test("a\0", "a\0");
-    test("abcd\0", "abcd\0");
-    test("abcd+efgh\0", "abcd efgh\0");
-    test("a%00b%01c%02\0", "a\x00b\x01c\x02\0");
-    for(ushort valueAsUShort = ubyte.min; valueAsUShort <= ubyte.max; valueAsUShort++) {
-        auto value = cast(ubyte)valueAsUShort;
-        char[2] expected;
-        expected[0] = cast(char)value;
-        expected[1] = '\0';
-
-        char[4] str;
-        str[0] = '%';
-        str[1] = toHexLower(cast(ubyte)(value >> 4));
-        str[2] = toHexLower(cast(ubyte)(value & 0x0F));
-        str[3] = '\0';
-
-        test(str, expected);
-
-        str[1] = toHexUpper(cast(ubyte)(value >> 4));
-        str[2] = toHexUpper(cast(ubyte)(value & 0x0F));
-
-        test(str, expected);
-    }
 }
 
 struct DefaultStdinReader
@@ -1554,10 +1271,10 @@ template delimited(char delimiter)
 
     mixin(q{
         inout(char)[] find(char sentinal = '\0')(inout(char)* haystack, const(char)[] needle)
-    } ~ format(findFormatCode, q{haystack.findChar!sentinal(delimiter)}, q{*nextLimit == sentinal}));
+    } ~ format(findFormatCode, q{haystack.findCharPtr!sentinal(delimiter)}, q{*nextLimit == sentinal}));
     mixin(q{
       inout(char)[] find(inout(char)* haystack, const(char)* limit,  const(char)[] needle)
-    } ~ format(findFormatCode, q{haystack.findChar(limit, delimiter)}, q{nextLimit == limit}));
+    } ~ format(findFormatCode, q{haystack.findCharPtr(limit, delimiter)}, q{nextLimit == limit}));
     pragma(inline)
     inout(char)[] find(inout(char)[] haystack, const(char)[] needle)
     {

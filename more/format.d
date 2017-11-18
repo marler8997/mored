@@ -60,8 +60,16 @@ void putf(R, U...)(R outputRange, string fmt, U args)
 /**
 Converts a 4-bit nibble to the corresponding hex character (0-9 or A-F).
 */
-char hexchar(Case case_ = Case.lower)(ubyte b) in { assert(b <= 0x0F); } body
+char toHex(Case case_ = Case.lower)(ubyte b) in { assert(b <= 0x0F); } body
 {
+    /*
+    NOTE: another implementation could be to use a hex table such as:
+       return "0123456789ABCDEF"[value];
+    HoweverThe table lookup might be slightly worse since it would require
+    the string table to be loaded into a cache line, whereas the current
+    implementation may be more instructions but all the code will
+    be in the same place which helps cache locality.
+      */
     static if(case_ == Case.lower)
     {
         return cast(char)(b + ((b <= 9) ? '0' : ('a'-10)));
@@ -73,13 +81,15 @@ char hexchar(Case case_ = Case.lower)(ubyte b) in { assert(b <= 0x0F); } body
 }
 unittest
 {
-    assert('0' == hexchar(0x0));
-    assert('9' == hexchar(0x9));
-    assert('A' == hexchar(0xA));
-    assert('F' == hexchar(0xF));
-    assert('a' == hexchar!(Case.upper)(0xA));
-    assert('f' == hexchar!(Case.upper)(0xF));
+    assert('0' == toHex(0x0));
+    assert('9' == toHex(0x9));
+    assert('a' == toHex(0xA));
+    assert('f' == toHex(0xF));
+    assert('A' == toHex!(Case.upper)(0xA));
+    assert('F' == toHex!(Case.upper)(0xF));
 }
+alias toHexLower = toHex!(Case.lower);
+alias toHexUpper = toHex!(Case.upper);
 
 bool asciiIsUnreadable(char c) pure nothrow @nogc @safe
 {
@@ -97,8 +107,8 @@ void asciiWriteUnreadable(scope void delegate(const(char)[]) sink, char c)
         char[4] buffer;
         buffer[0] = '\\';
         buffer[1] = 'x';
-        buffer[2] = hexchar((cast(char)c)>>4);
-        buffer[3] = hexchar((cast(char)c)&0xF);
+        buffer[2] = toHexUpper((cast(char)c)>>4);
+        buffer[3] = toHexUpper((cast(char)c)&0xF);
         sink(buffer);
     }
 }
@@ -161,8 +171,8 @@ void utf8WriteUnreadable(scope void delegate(const(char)[]) sink, dchar c)
         char[4] buffer;
         buffer[0] = '\\';
         buffer[1] = 'x';
-        buffer[2] = hexchar((cast(char)c)>>4);
-        buffer[3] = hexchar((cast(char)c)&0xF);
+        buffer[2] = toHexUpper((cast(char)c)>>4);
+        buffer[3] = toHexUpper((cast(char)c)&0xF);
         sink(buffer);
     }
 }
@@ -236,8 +246,8 @@ auto formatHex(Case case_ = Case.lower, T)(const(T)[] array) if(T.sizeof == 1)
             char[2] chars;
             foreach(value; array)
             {
-                chars[0] = hexchar!case_((cast(char)value)>>4);
-                chars[1] = hexchar!case_((cast(char)value)&0xF);
+                chars[0] = toHex!case_((cast(char)value)>>4);
+                chars[1] = toHex!case_((cast(char)value)&0xF);
                 sink(chars);
             }
         }

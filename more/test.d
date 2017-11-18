@@ -126,6 +126,9 @@ int main(string[] args) {
       addFile("sdlreflection.d", debug_, true);
       addFile("sos.d"          , debug_, true);
       addFile("format.d"       , debug_, true);
+      addFile("uri.d"          , debug_, true);
+      addFile("parse.d"        , debug_, true);
+      addFile("cgi.d"        , debug_, true);
 
     } else if(module_ == "common") {
 

@@ -14,7 +14,8 @@ struct Builder(T, Expander)
     T[] buffer;
     size_t dataLength;
 
-    @property T[] data() { return buffer[0..dataLength]; }
+    @property T[] data() const { return cast(T[])buffer[0..dataLength]; }
+    @property T[] available() const { return cast(T[])buffer[dataLength..$]; }
 
     T* getRef(size_t index)
     {
