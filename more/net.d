@@ -290,7 +290,7 @@ else version(Posix)
     extern(C) sysresult_t listen(socket_t sock, uint backlog);
     extern(C) socket_t accept(socket_t sock,  const(sockaddr)* addr, socklen_t* addrlen);
     extern(C) ptrdiff_t recv(socket_t sock, ubyte* buffer, size_t len, uint flags);
-    extern(C) ptrdiff_t send(socket_t sock, ubyte* buffer, size_t len, uint flags);
+    extern(C) ptrdiff_t send(socket_t sock, const(ubyte)* buffer, size_t len, uint flags);
     extern(C) sysresult_t getpeername(socket_t sock, sockaddr* addr, socklen_t* addrlen);
     extern(C) sysresult_t shutdown(socket_t sock, Shutdown how);
 
@@ -533,7 +533,7 @@ socket_t accept(T)(socket_t sock, T* addr)
     return accept(sock, cast(sockaddr*)addr, &fromlen);
 }
 pragma(inline)
-auto send(T)(socket_t sock, const(T)* buffer, uint len, uint flags = 0)
+auto send(T)(socket_t sock, const(T)* buffer, size_t len, uint flags = 0)
     if(T.sizeof == 1 && !is(T == ubyte))
 {
     return send(sock, cast(const(ubyte)*)buffer, len, flags);

@@ -19,6 +19,22 @@ template HttpParser(H)
         carriageReturn, // '\r'
         lineFeed,       // '\n
     }
+    static if(H.SupportCallbackStop)
+    {
+        alias OnReturnType = Flag!"stop";
+        string genCallbackCode(string call)
+        {
+            return `if(` ~ call ~ `) { parser.nextParse = &parseDone; return; }`;
+        }
+    }
+    else
+    {
+        alias OnReturnType = void;
+        string genCallbackCode(string call)
+        {
+            return call ~ ";";
+        }
+    }
 
     struct HttpParser
     {
@@ -36,6 +52,10 @@ template HttpParser(H)
         {
             this = this.init;
         }
+        @property bool done() const
+        {
+            return nextParse is &parseDone;
+        }
         void parse(H.DataType[] buffer)
         {
             nextParse(&this, buffer);
@@ -45,14 +65,17 @@ template HttpParser(H)
     {
         assert(0, "parse was called in an invalid state!");
     }
-
+    private final void parseDone(HttpParser* parser, H.DataType[] buffer)
+    {
+        assert(0, "the http parser is done");
+    }
     private final void parseMethod(HttpParser* parser, H.DataType[] buffer)
     {
         for(uint i = 0; i < buffer.length; i++)
         {
             if(' ' == buffer[i] )
             {
-                H.onMethod(parser, buffer[0..i]);
+                mixin(genCallbackCode(`H.onMethod(parser, buffer[0..i])`));
                 parser.nextParse = &parseUri;
                 parseUri(parser, buffer[i + 1..$]);
                 return;
@@ -73,14 +96,13 @@ template HttpParser(H)
 
         static if(H.SupportPartialData)
         {
-            H.onMethodPartial(parser, buffer);
+            mixin(genCallbackCode(`H.onMethodPartial(parser, buffer)`));
         }
         else
         {
             assert(0, "partial data unsupported");
         }
     }
-
 
 
     /*
@@ -97,7 +119,7 @@ template HttpParser(H)
         {
             if(' ' == buffer[i])
             {
-                H.onUri(parser, buffer[0..i]);
+                mixin(genCallbackCode(`H.onUri(parser, buffer[0..i])`));
                 parser.nextParse = &parseVersionAndNewline;
                 parser.parserStateUint0 = 0;
                 parseVersionAndNewline(parser, buffer[i + 1..$]);
@@ -122,7 +144,7 @@ template HttpParser(H)
 
         static if(H.SupportPartialData)
         {
-            H.onUriPartial(parser, buffer);
+            mixin(genCallbackCode(`H.onUriPartial(parser, buffer)`));
         }
         else
         {
@@ -133,7 +155,7 @@ template HttpParser(H)
     enum HTTP_VERSION_AND_NEWLINE = "HTTP/1.1\r\n";
     private final void parseVersionAndNewline(HttpParser* parser, H.DataType[] buffer)
     {
-        uint compareLength = HTTP_VERSION_AND_NEWLINE.length - parser.parserStateUint0;
+        uint compareLength = cast(uint)HTTP_VERSION_AND_NEWLINE.length - parser.parserStateUint0;
         if(compareLength > buffer.length)
         {
             if(HTTP_VERSION_AND_NEWLINE[parser.parserStateUint0..parser.parserStateUint0 + buffer.length] != buffer[])
@@ -164,6 +186,7 @@ template HttpParser(H)
             if(buffer[0] == '\n')
             {
                 H.onHeadersDone(parser, buffer[1..$]);
+                parser.nextParse = &parseDone;
             }
         }
     }
@@ -191,7 +214,7 @@ template HttpParser(H)
         {
             if(':' == buffer[i] )
             {
-                H.onHeaderName(parser, buffer[0..i]);
+                mixin(genCallbackCode(`H.onHeaderName(parser, buffer[0..i])`));
                 parser.nextParse = &initialParseHeaderValue;
                 initialParseHeaderValue(parser, buffer[i + 1..$]);
                 return;
@@ -211,7 +234,7 @@ template HttpParser(H)
         }
         static if(H.SupportPartialData)
         {
-            H.onHeaderNamePartial(parser, buffer);
+            mixin(genCallbackCode(`H.onHeaderNamePartial(parser, buffer)`));
         }
         else
         {
@@ -254,7 +277,8 @@ template HttpParser(H)
                         buffer = buffer[1..$];
                         goto case SaveHeaderValueState.lineFeed;
                     }
-                    H.onHeaderValuePartial(parser, cast(const(H.DataType)[])"\r");
+                    // TODO: pass in the original buffer, not a string
+                    mixin(genCallbackCode(`H.onHeaderValuePartial(parser, cast(const(H.DataType)[])"\r")`));
                     parser.headerValueState = SaveHeaderValueState.noNewline;
                     break;
                 case SaveHeaderValueState.lineFeed:
@@ -265,12 +289,13 @@ template HttpParser(H)
                     if(buffer[0] != ' ' && buffer[0] != '\t')
                     {
                         // header value was already finished
-                        H.onHeaderValue(parser, null);
+                        mixin(genCallbackCode(`H.onHeaderValue(parser, null)`));
                         parser.nextParse = &initialParseHeaderName;
                         initialParseHeaderName(parser, buffer);
                         return;
                     }
-                    H.onHeaderValuePartial(parser, cast(const(H.DataType)[])"\r\n");
+                    // TODO: pass in the original buffer, not a string
+                    mixin(genCallbackCode(`H.onHeaderValuePartial(parser, cast(const(H.DataType)[])"\r\n")`));
                     parser.headerValueState = SaveHeaderValueState.noNewline;
                     break;
             }
@@ -278,14 +303,13 @@ template HttpParser(H)
             assert(parser.headerValueState == SaveHeaderValueState.noNewline);
         }
 
-
         for(uint i = 0; i + 2 < buffer.length; i++)
         {
             if('\r' == buffer[i + 0] &&
                '\n' == buffer[i + 1] &&
               (' '  != buffer[i + 2] && '\t' != buffer[i + 2]))
             {
-                H.onHeaderValue(parser, buffer[0..i]);
+                mixin(genCallbackCode(`H.onHeaderValue(parser, buffer[0..i])`));
                 parser.nextParse = &initialParseHeaderName;
                 initialParseHeaderName(parser, buffer[i + 2..$]);
                 return;
@@ -330,7 +354,7 @@ template HttpParser(H)
                 }
                 if(buffer.length > saved)
                 {
-                    H.onHeaderValuePartial(parser, buffer[0..$-saved]);
+                    mixin(genCallbackCode(`H.onHeaderValuePartial(parser, buffer[0..$-saved])`));
                 }
             }
         }
@@ -701,6 +725,7 @@ unittest
         enum MaximumHeaderName = 40;
 
         enum SupportPartialData = false;
+        enum SupportCallbackStop = false;
         mixin template HttpParserMixinTemplate()
         {
             ExpectedData expected;
@@ -739,6 +764,7 @@ unittest
         enum MaximumHeaderName = 40;
 
         enum SupportPartialData = true;
+        enum SupportCallbackStop = false;
         mixin template HttpParserMixinTemplate()
         {
             ExpectedData expected;
@@ -778,6 +804,70 @@ unittest
         static void onHeaderValue(HttpParser!Hooks2* parser, DataType[] value)
         {
             parser.expected.onHeaderValue(value);
+        }
+        static void onHeadersDone(HttpParser!Hooks2* parser, DataType[] bodyData)
+        {
+            parser.expected.onHeadersDone(bodyData);
+        }
+    }
+    // TODO: add tests to make sure the SupportCallbackStop works properly
+    static struct Hooks3
+    {
+        alias DataType = char;
+
+        // Note: maximum are meant to stop bad data earlier on, they do not increase memory usage
+        enum MaximumMethodName = 30;
+        enum MaximumHeaderName = 40;
+
+        enum SupportPartialData = true;
+        enum SupportCallbackStop = true;
+        mixin template HttpParserMixinTemplate()
+        {
+            ExpectedData expected;
+        }
+        static void onBadRequest(HttpParser!Hooks2* parser, HttpBadRequestReason reason)
+        {
+            parser.expected.onBadRequest(reason);
+        }
+        static Flag!"stop" onMethodPartial(HttpParser!Hooks2* parser, DataType[] method)
+        {
+            parser.expected.onMethodPartial(method);
+            return No.stop;
+        }
+        static Flag!"stop" onMethod(HttpParser!Hooks2* parser, DataType[] method)
+        {
+            parser.expected.onMethod(method);
+            return No.stop;
+        }
+        static Flag!"stop" onUriPartial(HttpParser!Hooks2* parser, DataType[] uri)
+        {
+            parser.expected.onUriPartial(uri);
+            return No.stop;
+        }
+        static Flag!"stop" onUri(HttpParser!Hooks2* parser, DataType[] uri)
+        {
+            parser.expected.onUri(uri);
+            return No.stop;
+        }
+        static Flag!"stop" onHeaderNamePartial(HttpParser!Hooks2* parser, DataType[] headerName)
+        {
+            parser.expected.onHeaderNamePartial(headerName);
+            return No.stop;
+        }
+        static Flag!"stop" onHeaderName(HttpParser!Hooks2* parser, DataType[] headerName)
+        {
+            parser.expected.onHeaderName(headerName);
+            return No.stop;
+        }
+        static Flag!"stop" onHeaderValuePartial(HttpParser!Hooks2* parser, DataType[] value)
+        {
+            parser.expected.onHeaderValuePartial(value);
+            return No.stop;
+        }
+        static Flag!"stop" onHeaderValue(HttpParser!Hooks2* parser, DataType[] value)
+        {
+            parser.expected.onHeaderValue(value);
+            return No.stop;
         }
         static void onHeadersDone(HttpParser!Hooks2* parser, DataType[] bodyData)
         {
