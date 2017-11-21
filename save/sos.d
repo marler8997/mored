@@ -6,6 +6,11 @@ import std.string;
 
 import more.common;
 
+version(unittest)
+{
+  import more.test;
+}
+
 template SosTypeName(T)
 {
   static if(isArray!T) {
@@ -57,7 +62,7 @@ template SosTypeNames(alias sep, T...)
   }
 }
 +/
-version(unittest_sos) unittest
+unittest
 {
   mixin(scopedTest!("Sos Types"));
 
@@ -184,9 +189,7 @@ public class SosMethodDefinition
   }
 }
 
-
-
-version(unittest_sos) unittest
+unittest
 {
   mixin(scopedTest!("Sos Method Definitions"));
 

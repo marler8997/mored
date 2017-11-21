@@ -1,253 +1,45 @@
-import std.stdio;
-import std.file;
-import std.getopt;
-import std.array;
-import std.path;
-import std.process;
-import std.datetime;
+module more.test;
 
-import more.common;
+import std.stdio : writeln;
+import std.format : format;
 
-auto sourceFiles = appender!(SourceFile[])();
-struct SourceFile
+enum outerBar = "=========================================";
+enum innerBar = "-----------------------------------------";
+void startTest(string name)
 {
-  string filename;
-  bool debug_;
-  bool unittest_;
-
-  SourceFile combine(SourceFile *other)
-  {
-    return SourceFile(filename,
-                      debug_ || other.debug_,
-                      unittest_ || unittest_);
-  }
+    writeln(outerBar);
+    writeln(name, ": Start");
+    writeln(innerBar);
 }
-
-void addFile(string filename, bool debug_, bool unittest_) {
-  foreach(i, existingFile; sourceFiles.data) {
-    if(filename == existingFile.filename) {
-      sourceFiles.data[i] = SourceFile(filename,
-                                 debug_ || existingFile.debug_,
-                                 unittest_ || existingFile.unittest_);
-      return;
-    }
-  }
-  debug writefln("[DEBUG] added file '%s'", filename);
-  sourceFiles.put(SourceFile(filename, debug_, unittest_));
-}
-
-
-bool exec(const(char[]) command)
+void endFailedTest(string name)
 {
-  writefln("%s", command);
-  stdout.flush();
-  long before = Clock.currStdTime();
-  auto output = executeShell(command);
-  if(output.status) {
-    writefln("FAILED: %s", command);
-    writeln("-----failed output-----------");
-    writeln(output.output);
-    writeln("-----end of output-----------");
-    writeln();
-    writefln("FAILED");
-    return false;
-  }
-  write(output.output);
-
-  
-  write("");
-  foreach(i; 0..command.length+ 2) write(' ');
-  writeln(prettyTime(stdTimeMillis(Clock.currStdTime() - before)));
-  stdout.flush();
-  return true;
+    writeln(innerBar);
+    writeln(name, ": Failed");
+    writeln(outerBar);
 }
-void spawn(const(char[]) command)
+void endPassedTest(string name)
 {
-  writefln("%s", command);
-  stdout.flush();
-  long before = Clock.currStdTime();
-  auto pid = spawnShell(command);
-  wait(pid);
-  foreach(i; 0..command.length+ 2) write(' ');
-  writeln(prettyTime(stdTimeMillis(Clock.currStdTime() - before)));
-  stdout.flush();
+    writeln(innerBar);
+    writeln(name, ": Passed");
+    writeln(outerBar);
 }
-
-void copy(char[] dst, ref size_t offset, const(char)[] src) {
-  dst[offset..offset+src.length] = src;
-  offset += src.length;
+template scopedTest(string name) {
+    enum scopedTest =
+      "startTest(\""~name~"\");"~
+      "scope(failure) {stdout.flush();endFailedTest(\""~name~"\");}"~
+      "scope(success) endPassedTest(\""~name~"\");";
 }
-
-void usage() {
-  writeln("test [options...] modules...");
-  writeln("    modules all, common, utf8, sdl, sdlreflection, sos");
-  writeln(" options:");
-  writeln("    --D       generate docs");
-  writeln("    --debug   compile as debug");
-  writeln("    --cov     compile with -cov flag");
-  writeln("    --notest  skip the unit tests");
+void writeSection(string name)
+{
+    writeln(innerBar);
+    writeln(name);
+    writeln(innerBar);
 }
-int main(string[] args) {
-  bool generateDoc;
-  bool debug_;
-  bool cov;
-  bool notest;
-
-  // Add more options
-  // DDox JSON -D -X -Xfdocs.json
-
-  getopt(args,
-         "D", &generateDoc,
-         "debug", &debug_,
-         "cov", &cov,
-         "notest", &notest);
-
-  bool unittest_ = !notest;
-
-  if(args.length <= 1) {
-    usage();
-    return 1;
-  }
-
-  version(Windows) {
-    enum executableName = "unittest.exe";
-  } else {
-    enum executableName = "unittest";
-  }
-
-
-  foreach(arg; args[1..$]) {
-    string module_ = arg;
-    if(module_ == "all") {
-
-      addFile("common.d"       , debug_, true);
-      addFile("utf8.d"         , debug_, true);
-      addFile("sdl.d"          , debug_, true);
-      addFile("sdlreflection.d", debug_, true);
-      addFile("sos.d"          , debug_, true);
-      addFile("format.d"       , debug_, true);
-      addFile("uri.d"          , debug_, true);
-      addFile("parse.d"        , debug_, true);
-      addFile("cgi.d"        , debug_, true);
-
-    } else if(module_ == "common") {
-
-      addFile("common.d"       , debug_, true);
-
-    } else if(module_ == "path") {
-
-      addFile("common.d"       , false, false);
-      addFile("path.d"         , debug_, true);
-
-    } else if(module_ == "repos") {
-
-      addFile("common.d"        , false, false);
-      addFile("utf8.d"          , false, false);
-      addFile("fields.d"        , false, false);
-      addFile("path.d"          , false, false);
-      addFile("repos.d"         , debug_, true);
-
-    } else if(module_ == "utf8") {
-
-      addFile("common.d"       , false, false);
-      addFile("utf8.d"       , debug_, true);
-
-    } else if(module_ == "fields") {
-
-      addFile("common.d"       , false, false);
-      addFile("utf8.d"         , false, false);
-      addFile("fields.d"       , debug_, true);
-
-      /*
-    } else if(module_ == "ason") {
-
-      addFile("common.d"       , false, false);
-      addFile("utf8.d"         , false, false);
-      addFile("ason.d"         , debug_, true);
-      */
-    } else if(module_ == "sdl") {
-
-      addFile("common.d"       , false, false);
-      addFile("utf8.d"         , false, false);
-      addFile("sdl.d"          , debug_, true);
-
-    } else if(module_ == "sdl2") {
-
-      addFile("common.d"       , false, false);
-      addFile("utf8.d"         , false, false);
-      addFile("sdl2.d"         , debug_, true);
-
-    } else if(module_ == "sdlreflection") {
-
-      addFile("common.d"       , false, false);
-      addFile("utf8.d"         , false, false);
-      addFile("sdl.d"          , false, false);
-      addFile("sdlreflection.d", debug_, true);
-
-    } else if(module_ == "sos") {
-
-      addFile("common.d"       , false, false);
-      addFile("sos.d", debug_, true);
-
-    } else {
-      writefln("Error: unknown module '%s'", module_);
-      return 1;
+void assertEqual(string expected, string actual) pure
+{
+    if(expected != actual) {
+      throw new Exception(format("Expected %s Actual %s",
+          expected ? ('"' ~ expected ~ '"') : "<null>",
+          actual   ? ('"' ~ actual   ~ '"') : "<null>"));
     }
-  }
-
-  enum compiler = "dmd";
-  auto buildCommand = appender!(char[])();
-  
-  //
-  // options
-  //
-  buildCommand.clear();
-  buildCommand.put(compiler);
-
-  buildCommand.put(" -I..");
-
-  buildCommand.put(" -of");
-  buildCommand.put(executableName);
-
-  buildCommand.put(" -main");
-
-  if(unittest_)
-    buildCommand.put(" -unittest");
-
-  if(debug_)
-    buildCommand.put(" -debug");
-
-  if(generateDoc) {
-    //buildCommand.put(" -D");
-    buildCommand.put(" -D -X -Xfdocs.json");
-  }
-
-  if(cov)
-    buildCommand.put(" -cov");
-
-  //flags ~= " -O";
-  //flags ~= " -noboundscheck";
-  //flags ~= " -inline";
-
-  foreach(source; sourceFiles.data) {
-    if(unittest_ && source.unittest_) {
-      buildCommand.put(" -version=unittest_");
-      buildCommand.put(stripExtension(source.filename));
-    }
-
-    buildCommand.put(' ');
-    buildCommand.put(source.filename);
-  }
-
-  if(!exec(buildCommand.data)) return 1;
-  
-  if(unittest_) {
-    version(Windows) {
-      spawn(executableName);
-    } else {
-      spawn("./"~executableName);
-    }
-  }
-
-  return 0;
 }

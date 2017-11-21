@@ -24,7 +24,6 @@ enum EventFlags : ubyte
 
 enum NO_TIMER = 0;
 
-
 enum SelectSet { read = 0, write = 1, error = 2}
 struct SelectSetProperties
 {

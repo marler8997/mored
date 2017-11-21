@@ -1,6 +1,7 @@
 import std.stdio;
 import std.string : indexOf, lastIndexOf;
-import std.algorithm : cmp;
+static import std.algorithm;
+import std.algorithm : sort;
 import std.conv : to;
 
 /**

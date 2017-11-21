@@ -1,0 +1,6 @@
+import dlang;
+
+dlang.run
+{
+    source "gendeps.d";
+}

@@ -95,6 +95,17 @@ pragma(inline) inout(char)* skipSpace(inout(char)* str, const(char)* limit)
     return skipCharSet!" "(str, limit);
 }
 
+// TODO: create more overloads
+bool startsWith(const(char)* str, const(char)* limit, const(char)[] needle)
+{
+    auto size = limit - str;
+    if(size < needle.length)
+    {
+        return false;
+    }
+    return str[0..needle.length] == needle[];
+}
+
 /** Returns a pointer to the first occurence of $(D c) or $(D sentinal).
 */
 inout(char)* findCharPtr(char sentinal = '\0')(inout(char)* str, char c)
@@ -126,7 +137,25 @@ inout(char)* findCharPtr(inout(char)[] str, char c)
 /** Returns the index of the first occurence of $(D c).  If no $(D c) is found
     then the length of the string is returned.
  */
-size_t findCharIndex(inout(char)[] str, char c)
+size_t findCharIndex(char sentinal = '\0')(const(char)* str, char c)
+{
+    auto saveStart = str;
+    for(;;str++) {
+        if(*str == c || *str == sentinal) {
+            return str - saveStart;
+        }
+    }
+}
+size_t findCharIndex(const(char)* str, const(char)* limit, char c)
+{
+    auto saveStart = str;
+    for(;;str++) {
+        if(str >= limit || *str == c) {
+           return str - saveStart;
+        }
+    }
+}
+size_t findCharIndex(const(char)[] str, char c)
 {
     foreach(i, strChar; str) {
         if(c == strChar) {

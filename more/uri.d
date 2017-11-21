@@ -6,7 +6,7 @@ import more.parse : hexValue;
 version(unittest)
 {
     import std.stdio : stdout;
-    import more.common : scopedTest, startTest, endFailedTest, endPassedTest;
+    import more.test;
 }
 
 // http://www.ietf.org/rfc/rfc2396.txt

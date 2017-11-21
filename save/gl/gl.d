@@ -4,7 +4,7 @@ import std.stdio;
 import std.conv;
 import std.string;
 
-import glad.gl.enums;
+//import glad.gl.enums;
 import glad.gl.funcs;
 import glad.gl.ext;
 import glad.gl.loader;

@@ -5,7 +5,7 @@ import std.string;
 import more.utf8;
 import more.common;
 
-version(unittest_fields)
+version(unittest)
 {
   import std.stdio;
 }
@@ -44,7 +44,7 @@ struct Text
     this.next = chars.ptr;
 
     if(chars.length > 0) {
-      c = decodeUtf8(this.next, this.limit);
+      c = decodeUtf8(&this.next, this.limit);
     }
   }
   @property bool empty() {
@@ -54,7 +54,7 @@ struct Text
   void skipChar() {
     cpos = next;
     if(next < limit) {
-      c = decodeUtf8(next, limit);
+      c = decodeUtf8(&next, limit);
     }
   }
 
@@ -62,7 +62,7 @@ struct Text
   {
     while(true) {
       if(next >= limit) break;
-      c = decodeUtf8(next, limit);
+      c = decodeUtf8(&next, limit);
       if(c == '\n') {
         lineNumber++;
         column = 1;
@@ -71,7 +71,7 @@ struct Text
     }
     cpos = next;
     if(next < limit) {
-      c = decodeUtf8(next, limit);
+      c = decodeUtf8(&next, limit);
     }
   }
   void toNewline()
@@ -79,7 +79,7 @@ struct Text
     while(true) {
       cpos = next;
       if(next >= limit) break;
-      c = decodeUtf8(next, limit);
+      c = decodeUtf8(&next, limit);
       column++;
       if(c == '\n') {
         break;
@@ -95,7 +95,7 @@ struct Text
       while(true) {
         cpos = next;
         if(next >= limit) break;
-        c = decodeUtf8(next, limit);
+        c = decodeUtf8(&next, limit);
         column++;
         if(isControlChar(c)) {
 
@@ -106,7 +106,7 @@ struct Text
             break;
           }
           auto saveNext = next;
-          c = decodeUtf8(next, limit);
+          c = decodeUtf8(&next, limit);
           next = saveNext;
 
           if(c == '*' || c == '/') {
@@ -149,7 +149,7 @@ struct Text
 
         if(next >= limit) return;
 
-        c = decodeUtf8(next, limit);
+        c = decodeUtf8(&next, limit);
 
         if(c == '/') {
 
@@ -172,7 +172,7 @@ struct Text
         MULTILINE_COMMENT_LOOP:
           while(next < limit) {
 
-            c = decodeUtf8(next, limit); // no need to save cpos since c will be thrown away
+            c = decodeUtf8(&next, limit); // no need to save cpos since c will be thrown away
             column++;
 
             if(c == '\n') {
@@ -183,7 +183,7 @@ struct Text
               // loop assume c is pointing to a '*' and next is pointing to the next characer
               while(next < limit) {
 
-                c = decodeUtf8(next, limit);
+                c = decodeUtf8(&next, limit);
                 column++;
                 if(c == '/') break MULTILINE_COMMENT_LOOP;
                 if(c == '\n') {
@@ -211,7 +211,7 @@ struct Text
       //
       cpos = next;
       if(next >= limit) return;
-      c = decodeUtf8(next, limit);
+      c = decodeUtf8(&next, limit);
       column++;
     }
 
@@ -284,7 +284,7 @@ struct Text
 
     cpos = next;
     if(next < limit) {
-      c = decodeUtf8(next, limit);
+      c = decodeUtf8(&next, limit);
     }
     return true;
   }
@@ -327,7 +327,7 @@ void parseField(ref FieldToken token, ref Text text)
     // no need to save cpos since c will be thrown away
     while(true) {
       if(next >= limit) break;
-      c = decodeUtf8(next, limit);
+      c = decodeUtf8(&next, limit);
       if(c == '\n') {
         text.lineNumber++;
         text.column = 1;
@@ -336,7 +336,7 @@ void parseField(ref FieldToken token, ref Text text)
     }
     cpos = next;
     if(next < limit) {
-      c = decodeUtf8(next, limit);
+      c = decodeUtf8(&next, limit);
     }
   }
   // ExpectedState:
@@ -352,7 +352,7 @@ void parseField(ref FieldToken token, ref Text text)
       while(true) {
         cpos = next;
         if(next >= limit) break;
-        c = decodeUtf8(next, limit);
+        c = decodeUtf8(&next, limit);
         text.column++;
         if(isControlChar(c)) {
           break;
@@ -386,7 +386,7 @@ void parseField(ref FieldToken token, ref Text text)
 
         if(next >= limit) return;
 
-        c = decodeUtf8(next, limit);
+        c = decodeUtf8(&next, limit);
 
         if(c == '/') {
 
@@ -399,7 +399,7 @@ void parseField(ref FieldToken token, ref Text text)
         MULTILINE_COMMENT_LOOP:
           while(next < limit) {
 
-            c = decodeUtf8(next, limit); // no need to save cpos since c will be thrown away
+            c = decodeUtf8(&next, limit); // no need to save cpos since c will be thrown away
             text.column++;
 
             if(c == '\n') {
@@ -410,7 +410,7 @@ void parseField(ref FieldToken token, ref Text text)
               // loop assume c is pointing to a '*' and next is pointing to the next characer
               while(next < limit) {
 
-                c = decodeUtf8(next, limit);
+                c = decodeUtf8(&next, limit);
                 text.column++;
                 if(c == '/') break MULTILINE_COMMENT_LOOP;
                 if(c == '\n') {
@@ -438,7 +438,7 @@ void parseField(ref FieldToken token, ref Text text)
       //
       cpos = next;
       if(next >= limit) return;
-      c = decodeUtf8(next, limit);
+      c = decodeUtf8(&next, limit);
       text.column++;
     }
 
@@ -448,7 +448,7 @@ void parseField(ref FieldToken token, ref Text text)
   // Read the first character
   //
   cpos = next;
-  c = decodeUtf8(next, limit);
+  c = decodeUtf8(&next, limit);
 
   skipWhitespaceAndComments();
   if(cpos >= limit) {
@@ -529,7 +529,7 @@ mixin("private __gshared immutable ubyte[256] charLookup = "~rangeInitializers
 
        )~";");
 
-version(unittest_fields) unittest
+unittest
 {
   writefln("Running Unit Tests...");
 

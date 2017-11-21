@@ -2,14 +2,10 @@ module more.utf8;
 
 import std.typecons : Flag, Yes, No;
 
-version(unittest_utf8)
+version(unittest)
 {
+    import more.test;
     import std.stdio;
-    import more.common;
-}
-
-version(unittest_utf8)
-{
     import std.string;
 }
 
@@ -140,7 +136,7 @@ template decodeUtf8Impl(Flag!"useLimit" useLimit)
   }
 }
 
-version(unittest_utf8) unittest
+unittest
 {
     mixin(scopedTest!("decodeUtf8"));
 
@@ -270,7 +266,7 @@ ubyte encodeUtf8(char* dst, dchar c)
     throw new Utf8EncodeException(format("encodeUtf8 got a value that was too large (0x%x)", c));
 }
 
-version(unittest_utf8) unittest
+unittest
 {
     mixin(scopedTest!("full utf8 encode/decode"));
     for(dchar c = 0; ;c++)

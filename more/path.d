@@ -2,11 +2,10 @@ module more.path;
 
 import std.path;
 
-version(unittest_path) {
+version(unittest) {
   import std.stdio;
   import core.stdc.stdlib : alloca;
-
-  import more.common;
+  import more.test;
 }
 
 auto rtrimDirSeparators(inout(char)[] path) @safe pure nothrow @nogc
@@ -60,7 +59,7 @@ size_t parentDirLength(inout(char)[] path) @safe pure nothrow @nogc
   return i+1;
 }
 
-version(unittest_path) unittest
+unittest
 {
   mixin(scopedTest!("parentDir function"));
 
@@ -120,7 +119,7 @@ struct ParentDirTraverser
   }
 }
 
-version(unittest_path) unittest
+unittest
 {
   mixin(scopedTest!("ParentDirTraverser"));
 
@@ -217,7 +216,7 @@ size_t normalizePathLength(bool useSlashes)(char[] path) @safe pure nothrow @nog
 }
 
 
-version(unittest_path) unittest
+unittest
 {
   mixin(scopedTest!("normalizePath function"));
 

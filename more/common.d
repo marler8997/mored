@@ -16,8 +16,8 @@ import core.stdc.string : memmove;
 version(unittest)
 {
   import std.array;
+  import more.test;
 }
-
 
 void implement(string feature = "", string file = __FILE__, int line = __LINE__) {
   string msg = "not implemented";
@@ -85,48 +85,6 @@ public interface IDisposable
   void dispose();
 }
 
-
-enum outerBar = "=========================================";
-enum innerBar = "-----------------------------------------";
-void startTest(string name)
-{
-  writeln(outerBar);
-  writeln(name, ": Start");
-  writeln(innerBar);
-}
-void endFailedTest(string name)
-{
-  writeln(innerBar);
-  writeln(name, ": Failed");
-  writeln(outerBar);
-}
-void endPassedTest(string name)
-{
-  writeln(innerBar);
-  writeln(name, ": Passed");
-  writeln(outerBar);
-}
-template scopedTest(string name) {
-  enum scopedTest =
-    "startTest(\""~name~"\");"~
-    "scope(failure) {stdout.flush();endFailedTest(\""~name~"\");}"~
-    "scope(success) endPassedTest(\""~name~"\");";
-}
-void writeSection(string name)
-{
-  writeln(innerBar);
-  writeln(name);
-  writeln(innerBar);
-}
-void assertEqual(string expected, string actual) pure
-{
-  if(expected != actual) {
-    throw new AssertError(format("Expected %s Actual %s",
-                                 expected ? ('"' ~ expected ~ '"') : "<null>",
-                                 actual   ? ('"' ~ actual   ~ '"') : "<null>"));
-  }
-}
-
 template Unroll(alias CODE, alias N, alias SEP="")
 {
     enum NEW_CODE = replace(CODE, "%", "%1$d");
@@ -191,7 +149,7 @@ void trimNewline(inout(char)[]* line) {
 }
 
 
-version(unittest_common) unittest
+unittest
 {
   mixin(scopedTest!("trimNewline"));
 
@@ -353,7 +311,7 @@ struct CustomLineParser
 }
 
 }
-version(unittest_common) unittest
+unittest
 {
   mixin(scopedTest!("LineParser"));
 
@@ -515,7 +473,7 @@ string tryParseFields(string comment = "#", T, C)(T fields, C[] line) if(isOutpu
   }
 }
 
-version(unittest_common) unittest
+unittest
 {
   mixin(scopedTest!("tryParseFields"));
 
@@ -776,7 +734,7 @@ inout(char)[] escape(inout(char)[] str) pure {
 
   return cast(inout(char)[])newString;
 }
-version(unittest_common) unittest
+unittest
 {
   mixin(scopedTest!("escape"));
 
@@ -1161,7 +1119,7 @@ struct StringByLine
 auto byLine(string s) pure nothrow @safe @nogc {
   return StringByLine(s);
 }
-version(unittest_common) unittest
+unittest
 {
   mixin(scopedTest!("StringByLine"));
   
@@ -1281,7 +1239,7 @@ struct LinesChunker
   }
 }
 
-version(unittest_common)
+version(unittest)
 {
   struct CustomChunks {
     string[] chunks;
@@ -1328,7 +1286,7 @@ auto byLines(File file, char[] buffer, BufferTooSmall tooSmall) {
 }
 
 
-version(unittest_common) unittest
+unittest
 {
   mixin(scopedTest!("LinesChunker/LinesReader"));
 
@@ -1463,7 +1421,7 @@ auto byLine(File file, char[] buffer, BufferTooSmall tooSmall) {
 }
 */
 
-version(unittest_common) unittest
+unittest
 {
   mixin(scopedTest!("LineReader"));
 

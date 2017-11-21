@@ -420,7 +420,7 @@ string enumerateTraits(string fmt, string value) {
 +/
 
 
-version(unittest_sdlreflection) unittest
+unittest
 {
   mixin(scopedTest!("SdlReflection"));
 

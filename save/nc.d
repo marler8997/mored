@@ -9,7 +9,7 @@ import more.net : ISocketConnector, parseConnector, addressFromIPOrHost;
 version(Posix) {
   import std.exception : ErrnoException, errno;
 
-  import std.c.stdlib : malloc;
+  import core.stdc.stdlib : malloc;
 
   import core.sys.posix.netinet.in_;
   import core.sys.posix.arpa.inet;

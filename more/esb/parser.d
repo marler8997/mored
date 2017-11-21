@@ -626,7 +626,6 @@ version(unittest)
     static void assertEqual(Statement expected, Statement actual)
     {
         assert(expected.expressions.length == actual.expressions.length);
-
     }
     static void test(string text, Statement[] expected)
     {
