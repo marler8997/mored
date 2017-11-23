@@ -163,7 +163,15 @@ version(Windows)
     struct fd_set
     {
         uint fd_count;
-        socket_t[0] fd_array;
+        union
+        {
+            socket_t[0] fd_array_0;
+            socket_t fd_array_first;
+        }
+        inout(socket_t)* fd_array() inout
+        {
+            return &fd_array_first;
+        }
     }
     struct fd_set_storage(size_t size)
     {
@@ -176,6 +184,61 @@ version(Windows)
         void addNoCheck(socket_t sock)
         {
             fd_array[fd_count++] = sock;
+        }
+    }
+
+    struct fd_set_dynamic(Allocator)
+    {
+        static size_t fdCountToMemSize(uint fd_count)
+        {
+            return uint.sizeof + fd_count * socket_t.sizeof;
+        }
+        static uint memSizeToFdCount(size_t memSize)
+        {
+            if(memSize == 0) return 0;
+            return cast(uint)((memSize - uint.sizeof) / socket_t.sizeof);
+        }
+
+        //static assert(hasMember!(Expander, "expand"), Expander.stringof~" does not have an expand function");
+        private fd_set* set;
+        private uint fd_capacity;
+        @property fd_set* ptr()
+        {
+            return set;
+        }
+        void reset()
+        {
+            if(set)
+            {
+                set.fd_count = 0;
+            }
+        }
+        void addNoCheck(socket_t sock)
+        {
+            import more.alloc : Mem;
+
+            if(set is null)
+            {
+                auto mem = Allocator.alloc(Mem(null, 0), fdCountToMemSize(1));
+                this.set = cast(fd_set*)mem.ptr;
+                this.fd_capacity = memSizeToFdCount(mem.size);
+                assert(this.fd_capacity >= 1);
+                this.set.fd_count = 1;
+                this.set.fd_array_first = sock;
+            }
+            else
+            {
+                if(set.fd_count >= fd_capacity)
+                {
+                    auto currentMemSize = fdCountToMemSize(fd_capacity);
+                    auto mem = Allocator.alloc(Mem(set, currentMemSize), fdCountToMemSize(fd_capacity + 1), 0, currentMemSize);
+                    this.set = cast(fd_set*)mem.ptr;
+                    auto newFdCapacity =  memSizeToFdCount(mem.size);
+                    assert(newFdCapacity > this.fd_capacity);
+                    this.fd_capacity = newFdCapacity;
+                }
+                (&set.fd_array_first)[set.fd_count++] = sock;
+            }
         }
     }
     extern(Windows) int select(int ignore, fd_set* readfds, fd_set* writefds, fd_set* exceptfds, timeval* timeout);
@@ -286,7 +349,7 @@ else version(Posix)
     {
       close(sock);
     }
-    extern(C) sysresult_t bind(socket_t sock, const(sockaddr)* addr, uint addrlen);
+    extern(C) sysresult_t bind(socket_t sock, const(sockaddr)* addr, socklen_t addrlen);
     extern(C) sysresult_t listen(socket_t sock, uint backlog);
     extern(C) socket_t accept(socket_t sock,  const(sockaddr)* addr, socklen_t* addrlen);
     extern(C) ptrdiff_t recv(socket_t sock, ubyte* buffer, size_t len, uint flags);
@@ -294,6 +357,19 @@ else version(Posix)
     extern(C) sysresult_t getpeername(socket_t sock, sockaddr* addr, socklen_t* addrlen);
     extern(C) sysresult_t shutdown(socket_t sock, Shutdown how);
 
+    struct addrinfo
+    {
+        uint      ai_flags;
+        uint      ai_family;
+        uint      ai_socktype;
+        uint      ai_protocol;
+        socklen_t ai_addrlen;
+        sockaddr* ai_addr;
+        char*     ai_canonname;
+        addrinfo* ai_next;
+    }
+    extern(C) sysresult_t getaddrinfo(const(char)* node, const(char)* service,
+        const(addrinfo)* hints, addrinfo** res);
 }
 else
 {

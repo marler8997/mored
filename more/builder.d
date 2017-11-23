@@ -107,53 +107,10 @@ struct Builder(T, Expander)
     }
 }
 
-// Always expands the to a power of 2 of the initial size.
-struct GCDoubler(uint initialSize)
-{
-    static T[] expand(T)(T[] array, size_t preserveSize, size_t neededSize)
-        in { assert(array.length < neededSize); } body
-    {
-        size_t newSize = (array.length == 0) ? initialSize : array.length * 2;
-        while(neededSize > newSize)
-        {
-            newSize *= 2;
-        }
-        // TODO: there might be a more efficient way to do this?
-        array.length = newSize;
-        return array;
-    }
-}
-
-struct MallocDoubler(uint initialSize)
-{
-    static import core.stdc.stdlib;
-    static import core.stdc.string;
-
-    static T[] expand(T)(T[] array, size_t preserveSize, size_t neededSize)
-        in { assert(array.length < neededSize); } body
-    {
-        size_t newSize = (array.length == 0) ? initialSize : array.length * 2;
-        while(neededSize > newSize)
-        {
-            newSize *= 2;
-        }
-        auto newPtr = cast(T*)core.stdc.stdlib.malloc(T.sizeof*newSize);
-        assert(newPtr, "malloc returned null");
-        if(preserveSize > 0)
-        {
-            core.stdc.string.memcpy(newPtr, array.ptr, T.sizeof*preserveSize);
-        }
-        if(array.ptr)
-        {
-            core.stdc.stdlib.free(array.ptr);
-        }
-        return newPtr[0..newSize];
-    }
-}
-
 unittest
 {
     static import core.stdc.stdlib;
+    import more.alloc : GCDoubler, MallocDoubler;
 
     {
         auto builder = Builder!(int, GCDoubler!100)();
