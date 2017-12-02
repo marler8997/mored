@@ -1,7 +1,7 @@
 module more.repos;
 
 import std.array;
-import std.path;
+import std.path : dirSeparator, globMatch;
 import std.file;
 
 import core.stdc.stdlib : alloca;
@@ -19,74 +19,85 @@ immutable gitDir = ".git";
  */
 string insideGitRepo(string path = getcwd()) nothrow @nogc
 {
-  auto pathBuffer = cast(char*)alloca(path.length + 1 + gitDir.length);
+    auto pathBuffer = cast(char*)alloca(path.length + 1 + gitDir.length);
 
-  char[] addGitDir(size_t s) nothrow @nogc
-  {
-    if(pathBuffer[s-1] == dirSeparator[0]) {
-      pathBuffer[s..s+gitDir.length] = gitDir;
-      return pathBuffer[0..s+gitDir.length];
-    } else {
-      pathBuffer[s] = dirSeparator[0];
-      pathBuffer[s+1..s+1+gitDir.length] = gitDir;
-      return pathBuffer[0..s+1+gitDir.length];
-    }
-  }
-
-  pathBuffer[0..path.length] = path;
-  auto gitPath = addGitDir(path.length);
-
-  while(true) {
-    auto currentDir = gitPath[0..$-gitDir.length-1];
-
-    if(exists(gitPath)) {
-      return path[0..currentDir.length];
+    char[] addGitDir(size_t s) nothrow @nogc
+    {
+        if(pathBuffer[s-1] == dirSeparator[0])
+        {
+            pathBuffer[s..s+gitDir.length] = gitDir;
+            return pathBuffer[0..s+gitDir.length];
+        }
+        else
+        {
+            pathBuffer[s] = dirSeparator[0];
+            pathBuffer[s+1..s+1+gitDir.length] = gitDir;
+            return pathBuffer[0..s+1+gitDir.length];
+        }
     }
 
-    auto newCheckPath = parentDir(currentDir);
-    if(newCheckPath.length == currentDir.length) {
-      return null;
-    }
+    pathBuffer[0..path.length] = path;
+    auto gitPath = addGitDir(path.length);
 
-    gitPath = addGitDir(newCheckPath.length);
-  }
+    while(true)
+    {
+        auto currentDir = gitPath[0..$-gitDir.length-1];
+        //import core.stdc.stdio;
+        //printf("checking '%.*s'\n", gitPath.length, gitPath.ptr);
+        if(exists(gitPath))
+        {
+            return path[0..currentDir.length];
+        }
+
+        auto newCheckPath = parentDir(currentDir);
+        if(newCheckPath.length == currentDir.length)
+        {
+            return null;
+        }
+
+        gitPath = addGitDir(newCheckPath.length);
+    }
 }
 
 struct Repo
 {
-  string localPath;
-  //string keyPath; // 
+    string localPath;
+    //string keyPath; //
 
-  string globMatcher;
+    string globMatcher;
 
-  void setupGlobMatcher()
-  {
-    this.globMatcher = localPath;
-  }
-  bool contains(string file) {
-    if(globMatcher is null) {
-      setupGlobMatcher();
+    void setupGlobMatcher()
+    {
+        this.globMatcher = localPath;
     }
-    return globMatch(globMatcher, file);
-  }
+    bool contains(string file)
+    {
+        if(globMatcher is null)
+        {
+            setupGlobMatcher();
+        }
+        return globMatch(globMatcher, file);
+    }
 }
 
 struct RepoSet
 {
-  Appender!(Repo[]) repos;
-  
-  bool pathBelongsToKnownRepo(string path, ref Repo foundRepo) {
-    foreach(repo; repos.data) {
-      if(repo.contains(path)) {
-        foundRepo = repo;
-        return true;
-      }
+    Appender!(Repo[]) repos;
+
+    bool pathBelongsToKnownRepo(string path, ref Repo foundRepo)
+    {
+        foreach(repo; repos.data)
+        {
+            if(repo.contains(path))
+            {
+                foundRepo = repo;
+                return true;
+            }
+        }
+        return false;
     }
-    return false;
-  }
 }
 RepoSet knownRepos;
-
 
 /**
 Find Repo Algorithm:
@@ -99,28 +110,30 @@ Find Repo Algorithm:
  */
 Repo findRepo(string repoName, string path = null)
 {
-  if(path.length <= 0) {
-    path = getcwd();
-  } else {
-    
-  }
+    if(path.length <= 0)
+    {
+        path = getcwd();
+    }
+    else
+    {
 
-  Repo currentRepo;
+    }
 
+    Repo currentRepo;
 
-
-  if(knownRepos.pathBelongsToKnownRepo(path, currentRepo)) {
+    if(knownRepos.pathBelongsToKnownRepo(path, currentRepo))
+    {
     path = currentRepo.localPath;
-  }
+    }
 
 
 
-  return Repo();
-/+
-  
+    return Repo();
+    /+
 
-  foreach(entry; dirEntries(path, SpanMode.shallow)) {
+
+    foreach(entry; dirEntries(path, SpanMode.shallow)) {
     if(
-  }
-+/
+    }
+    +/
 }
