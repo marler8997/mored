@@ -187,6 +187,8 @@ struct Sha1Builder
 
 unittest
 {
+    import more.test;
+    mixin(scopedTest!"sha");
     assert(Sha1(0xda39a3ee, 0x5e6b4b0d, 0x3255bfef, 0x95601890, 0xafd80709) == sha1Hash(null));
     assert(Sha1(0xA9993E36, 0x4706816A, 0xBA3E2571, 0x7850C26C, 0x9Cd0d89D) == sha1Hash("abc"));
     assert(Sha1(0x84983e44, 0x1c3bd26e, 0xbaae4aa1, 0xf95129e5, 0xe54670f1) ==

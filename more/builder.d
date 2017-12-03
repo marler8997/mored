@@ -109,6 +109,9 @@ struct Builder(T, Expander)
 
 unittest
 {
+    import more.test;
+    mixin(scopedTest!"builder");
+
     static import core.stdc.stdlib;
     import more.alloc : GCDoubler, MallocDoubler;
 

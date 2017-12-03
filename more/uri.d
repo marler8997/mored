@@ -50,6 +50,8 @@ uint parseScheme(const(char)[] uri)
 }
 unittest
 {
+    mixin(scopedTest!"uri - parseScheme");
+
     assert(0 == parseScheme(null));
     assert(0 == parseScheme(""));
     assert(0 == parseScheme("a"));
@@ -125,6 +127,8 @@ auto formatUriEncoded(const(char)[] str)
 }
 unittest
 {
+    mixin(scopedTest!"uri - formatUriEncoded");
+
     import std.format : format;
     assert(`` == format("%s", formatUriEncoded(``)));
     assert(`a` == format("%s", formatUriEncoded(`a`)));

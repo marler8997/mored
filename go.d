@@ -70,20 +70,21 @@ passfail exec(const(char[]) command)
     stdout.flush();
     long before = Clock.currStdTime();
     auto output = executeShell(command);
+    if(output.output.length > 0)
+    {
+        writeln("-------------------------------------------------");
+        write(output.output);
+        if(output.output.length == 0 || output.output[$-1] != '\n')
+        {
+            writeln();
+        }
+        writeln("-------------------------------------------------");
+    }
     if(output.status)
     {
-        writefln("FAILED: %s", command);
-        writeln("-----failed output-----------");
-        writeln(output.output);
-        writeln("-----end of output-----------");
-        writeln();
-        writefln("FAILED");
+        writefln("SHELL COMMAND FAILED(exitcode=%s): %s", output.status, command);
         return passfail.fail;
     }
-    write(output.output);
-
-    write("");
-    foreach(i; 0..command.length+ 2) write(' ');
     writeln(prettyTime(stdTimeMillis(Clock.currStdTime() - before)));
     stdout.flush();
     return passfail.pass;
@@ -262,6 +263,16 @@ int test(string[] args)
     }
 
     bool compiledDeps = false;
+
+    static void appendModule(T)(T builder, M mod)
+    {
+        builder.put(" ");
+        builder.put(mod.filename);
+    }
+
+    // Make sure this test is included because it is used by testmain.d
+    includeModule(M.test);
+
     {
         auto files = appender!(char[])();
         foreach(mod; EnumMembers!M)
@@ -271,8 +282,7 @@ int test(string[] args)
                 case ModuleState.exclude:
                     break;
                 case ModuleState.include:
-                    files.put(" ");
-                    files.put(mod.filename);
+                    appendModule(files, mod);
                     break;
                 case ModuleState.unittest_:
                     break;
@@ -292,6 +302,10 @@ int test(string[] args)
     //
     {
         auto files = appender!(char[])();
+
+        files.put(" ");
+        files.put("testmain.d");
+
         if(compiledDeps)
         {
             files.put(" ");
@@ -306,14 +320,12 @@ int test(string[] args)
                 case ModuleState.include:
                     break;
                 case ModuleState.unittest_:
-                    files.put(" ");
-                    files.put(mod.filename);
+                    appendModule(files, mod);
                     break;
             }
         }
-        
+
         auto options = appender!(char[])();
-        options.put(" -main");
         if(unittest_)
             options.put(" -unittest");
 

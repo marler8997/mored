@@ -66,9 +66,12 @@ char toHex(Case case_ = Case.lower)(ubyte b) in { assert(b <= 0x0F); } body
     NOTE: another implementation could be to use a hex table such as:
        return "0123456789ABCDEF"[value];
     HoweverThe table lookup might be slightly worse since it would require
-    the string table to be loaded into a cache line, whereas the current
+    the string table to be loaded into the processor cache, whereas the current
     implementation may be more instructions but all the code will
     be in the same place which helps cache locality.
+
+    On processors without cache (such as the 6502), the table lookup approach
+    would likely be faster.
       */
     static if(case_ == Case.lower)
     {
@@ -95,7 +98,6 @@ bool asciiIsUnreadable(char c) pure nothrow @nogc @safe
 {
     return c < ' ' || (c > '~' && c < 256);
 }
-
 void asciiWriteUnreadable(scope void delegate(const(char)[]) sink, char c)
     in { assert(asciiIsUnreadable(c)); } body
 {
@@ -315,6 +317,9 @@ auto formatEscapeSet(string escapePrefix, string escapeSet)(const(char)[] str)
 }
 unittest
 {
+    import more.test;
+    mixin(scopedTest!"format");
+
     import std.format : format;
     assert(`` == format("%s", formatEscapeSet!(`\`, `\'`)(``)));
     assert(`a` == format("%s", formatEscapeSet!(`\`, `\'`)(`a`)));

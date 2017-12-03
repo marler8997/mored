@@ -685,6 +685,9 @@ version(unittest)
 }
 unittest
 {
+    import more.test;
+    mixin(scopedTest!"httpparser");
+
     static void test(H)(HttpParser!H parser, ExpectedData expected, const(char)[] request)
     {
         if(H.SupportPartialData)
@@ -696,12 +699,12 @@ unittest
                 size_t offset = 0;
                 for(; offset + chunkLength <= request.length; offset += chunkLength)
                 {
-                    writefln("parsing \"%s\"", Escaped(request[offset..offset + chunkLength]));
+                    //writefln("parsing \"%s\"", Escaped(request[offset..offset + chunkLength]));
                     parser.parse(request[offset..offset + chunkLength]);
                 }
                 if(offset < request.length)
                 {
-                    writefln("parsing \"%s\"", Escaped(request[offset..$]));
+                    //writefln("parsing \"%s\"", Escaped(request[offset..$]));
                     parser.parse(request[offset..$]);
                 }
                 parser.expected.allDataHasBeenGiven();
@@ -711,7 +714,7 @@ unittest
         parser.expected.reset();
         parser.reset();
         parser.expected = expected;
-        writefln("parsing \"%s\"", Escaped(request));
+        //writefln("parsing \"%s\"", Escaped(request));
         parser.parse(request);
         parser.expected.allDataHasBeenGiven();
     }

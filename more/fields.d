@@ -7,15 +7,15 @@ import more.common;
 
 version(unittest)
 {
-  import std.stdio;
+    import std.stdio;
 }
 
 class TextParseException : Exception
 {
-  this(string msg)
-  {
-    super(msg);
-  }
+    this(string msg)
+    {
+        super(msg);
+    }
 }
 
 struct Text
@@ -531,6 +531,9 @@ mixin("private __gshared immutable ubyte[256] charLookup = "~rangeInitializers
 
 unittest
 {
+  import more.test;
+  mixin(scopedTest!"fields");
+
   writefln("Running Unit Tests...");
 
   void testParseFields(const(char)[] textString, FieldToken[] expectedTokens = [], size_t testLine = __LINE__)

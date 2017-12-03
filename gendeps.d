@@ -40,14 +40,13 @@ void outln(T...)(File file, string format, T args)
 
 int main(string[] args)
 {
-
     auto repoRootFullPath = dirName(__FILE_FULL_PATH__);
     auto repoRoot = buildNormalizedPath(relativePath(repoRootFullPath));
     moreRoot = buildPath(repoRoot, "more");
     auto outputFilename = buildPath(repoRoot, "moduledeps.d");
 
     args = args[1..$];
-    if(args[0] == "checked")
+    if(args.length > 0 && args[0] == "checked")
     {
         if(exists(outputFilename))
         {

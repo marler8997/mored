@@ -15,35 +15,36 @@ import core.stdc.string : memmove;
 
 version(unittest)
 {
-  import std.array;
-  import more.test;
+    import std.array;
+    import more.test;
 }
 
 void implement(string feature = "", string file = __FILE__, int line = __LINE__) {
-  string msg = "not implemented";
-  if(feature.length) {
-    msg = feature~' '~msg;
-  }
-  throw new Exception(msg, file, line);
+    string msg = "not implemented";
+    if(feature.length)
+    {
+        msg = feature~' '~msg;
+    }
+    throw new Exception(msg, file, line);
 }
 
 float stdTimeMillis(long stdTime)
 {
-  return cast(float)stdTime / 10000f;
+    return cast(float)stdTime / 10000f;
 }
 string prettyTime(float millis)
 {
-  if (millis < 0) return "-"~prettyTime(-millis);
-    
-  if (millis < 1000)
-    return to!string(millis)~" millis";
-  if (millis < 60000)
-    return to!string(millis / 1000)~" seconds";
-  if (millis < 3600000)
-    return to!string(millis / 60000)~" minutes";
-  if (millis < 86400000)
-    return to!string(millis / 3600000)~" hours";
-  return to!string(millis / 86400000)~" days";
+    if (millis < 0) return "-"~prettyTime(-millis);
+
+    if (millis < 1000)
+        return to!string(millis)~" millis";
+    if (millis < 60000)
+        return to!string(millis / 1000)~" seconds";
+    if (millis < 3600000)
+        return to!string(millis / 60000)~" minutes";
+    if (millis < 86400000)
+        return to!string(millis / 3600000)~" hours";
+    return to!string(millis / 86400000)~" days";
 }
 
 template isChar(T) {
@@ -57,10 +58,10 @@ template isChar(T) {
 
 template ArrayElementType(Type)
 {
-  static if(is(Type : E[], E))
-    alias ArrayElementType = E;
-  else
-    alias ArrayElementType = void;
+    static if(is(Type : E[], E))
+        alias ArrayElementType = E;
+    else
+        alias ArrayElementType = void;
 }
 template TypeTupleStrings(alias sep, T...)
 {
@@ -96,13 +97,13 @@ template UnrollTuple(alias CODE, alias SEP, T...)
     enum UnrollTuple = T.map!(t => format(NEW_CODE, t)).join(SEP);
 }
 
-
 public alias DataHandler = void delegate(ubyte[] data);
 public alias StringHandler = void delegate(string data);
 public interface IDataHandler : IDisposable
 {
   void handleData(ubyte[] data);
 }
+
 
 string debugChar(char c)
 {
@@ -166,17 +167,17 @@ unittest
   testTrimNewline("1234", "1234");
   testTrimNewline("abcd  \n", "abcd  ");
   testTrimNewline("hello\r\r\r\n\n\r\r\n", "hello");
-
 }
 
 
-void readFullSize(File file, char[] buffer) {
-  while(true) {
-    char[] lastRead = file.rawRead(buffer);
-    if(lastRead.length == buffer.length) return;
-    if(lastRead.length == 0) throw new Exception("File did not have enough data left to fill the buffer");
-    buffer = buffer[lastRead.length..$];
-  }
+void readFullSize(File file, char[] buffer)
+{
+    while(true) {
+        char[] lastRead = file.rawRead(buffer);
+        if(lastRead.length == buffer.length) return;
+        if(lastRead.length == 0) throw new Exception("File did not have enough data left to fill the buffer");
+        buffer = buffer[lastRead.length..$];
+    }
 }
 
 // returns true on success, false if the file reached EOF

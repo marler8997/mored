@@ -125,6 +125,9 @@ void listWriteln(T...)(T args)
 }
 unittest
 {
+    import more.test;
+    mixin(scopedTest!"cgi - Hello World");
+
     // just instantiate the templates
     // all of the following should print "Hello, World!\n"
     write("Hello");
@@ -890,6 +893,9 @@ alias formatJsDoubleQuote = formatEscapeSet!(`\`, `\"`);
 alias formatJsonString = formatEscapeSet!(`\`, `\"`);
 unittest
 {
+    import more.test;
+    mixin(scopedTest!"cgi - formatJsonString");
+
     assert(`` == format("%s", formatJsonString(``)));
     assert(`a` == format("%s", formatJsonString(`a`)));
     assert(`abcd` == format("%s", formatJsonString(`abcd`)));
@@ -1152,6 +1158,9 @@ alias zStringByLine = delimited!'\n'.sentinalRange!('\0', const(char));
 alias stringByLine = delimited!'\n'.range;
 unittest
 {
+    import more.test;
+    mixin(scopedTest!"cgi - strings by line");
+
     auto expected = ["a", "bcd", "ef"];
     {
         size_t i = 0;
@@ -1326,6 +1335,9 @@ template delimited(char delimiter)
 }
 unittest
 {
+    import more.test;
+    mixin(scopedTest!"cgi - delimited 1");
+
     assert("" == delimited!':'.find("\0".ptr, ""));
 
     assert(null == delimited!':'.find("\0".ptr, "a"));
@@ -1363,6 +1375,9 @@ unittest
 
 unittest
 {
+    import more.test;
+    mixin(scopedTest!"cgi - delimited 2");
+
     assert("" == delimited!':'.removeItem(null, 0, 0));
     assert("" == delimited!':'.removeItem("", 0, 0));
     assert("" == delimited!':'.removeItem("a", 0, 1));

@@ -1,7 +1,10 @@
 module more.test;
 
-import std.stdio : writeln;
+import std.stdio : writeln, writefln;
 import std.format : format;
+
+__gshared uint passTestCount;
+__gshared uint failTestCount;
 
 enum outerBar = "=========================================";
 enum innerBar = "-----------------------------------------";
@@ -13,12 +16,14 @@ void startTest(string name)
 }
 void endFailedTest(string name)
 {
+    failTestCount++;
     writeln(innerBar);
     writeln(name, ": Failed");
     writeln(outerBar);
 }
 void endPassedTest(string name)
 {
+    passTestCount++;
     writeln(innerBar);
     writeln(name, ": Passed");
     writeln(outerBar);
@@ -26,7 +31,7 @@ void endPassedTest(string name)
 template scopedTest(string name) {
     enum scopedTest =
       "startTest(\""~name~"\");"~
-      "scope(failure) {stdout.flush();endFailedTest(\""~name~"\");}"~
+      "scope(failure) {import std.stdio : stdout; stdout.flush();endFailedTest(\""~name~"\");}"~
       "scope(success) endPassedTest(\""~name~"\");";
 }
 void writeSection(string name)
@@ -42,4 +47,10 @@ void assertEqual(string expected, string actual) pure
           expected ? ('"' ~ expected ~ '"') : "<null>",
           actual   ? ('"' ~ actual   ~ '"') : "<null>"));
     }
+}
+void dumpTestResults()
+{
+    writeSection("Final Results");
+    writefln("%s test(s) passed", passTestCount);
+    writefln("%s test(s) failed", failTestCount);
 }

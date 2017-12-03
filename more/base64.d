@@ -48,6 +48,9 @@ auto formatBase64(T, size_t StackSize = 100)(const(T)[] data) if(T.sizeof == 1)
 }
 unittest
 {
+    import more.test;
+    mixin(scopedTest!"base64");
+
     import std.format : format;
     assert(format("%s", formatBase64(""))       == "");
     assert(format("%s", formatBase64("f"))      == "Zg==");

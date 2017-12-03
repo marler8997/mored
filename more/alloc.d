@@ -30,8 +30,6 @@ void cfree(T)(T* mem)
     core.stdc.stdlib.free(mem);
 }
 
-
-
 struct Mem
 {
     void* ptr;
