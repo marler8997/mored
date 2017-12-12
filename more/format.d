@@ -51,7 +51,7 @@ struct DelegateFormatter
 /**
 Append a formatted string into a character OutputRange
 */
-void putf(R, U...)(R outputRange, string fmt, U args)
+void putf(R, U...)(auto ref R outputRange, string fmt, U args)
 {
     import std.format : formattedWrite;
     formattedWrite(&outputRange.put!(const(char)[]), fmt, args);
