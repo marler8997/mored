@@ -167,7 +167,7 @@ int gendoc(string[] args)
         command.put(" ");
         command.put(mod.filename);
     }
-    if(failed(exec(command.data)))
+    if(exec(command.data).failed)
     {
         return 1; // fail
     }
@@ -290,7 +290,7 @@ int test(string[] args)
         }
         if(files.data.length > 0)
         {
-            if(failed(compile(unittestDepsOutFile, "-c", files.data)))
+            if(compile(unittestDepsOutFile, "-c", files.data).failed)
             {
                 return 1; // fail
             }
@@ -339,7 +339,7 @@ int test(string[] args)
         if(cov)
             options.put(" -cov");
 
-        if(failed(compile("unittest", options.data, files.data)))
+        if(compile("unittest", options.data, files.data).failed)
         {
             return 1; // fail
         }

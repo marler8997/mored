@@ -9,11 +9,29 @@ module more.types;
 struct passfail
 {
     private bool _passed;
-    @property static passfail pass() { return passfail(true); }
-    @property static passfail fail() { return passfail(false); }
+    @property static passfail pass() pure nothrow @nogc { return passfail(true); }
+    @property static passfail fail() pure nothrow @nogc { return passfail(false); }
     @disable this();
-    private this(bool _passed) { this._passed = _passed; }
+    private this(bool _passed) pure nothrow @nogc { this._passed = _passed; }
+    /*
+    pragma(inline) @property bool asBool() { return _passed; }
+    alias asBool this;
+    */
     string toString() { return _passed ? "pass" : "fail"; }
+
+    @property auto passed() const pure nothrow @nogc { return _passed; }
+    @property auto failed() const pure nothrow @nogc { return !_passed; }
+
+    passfail opBinary(string op)(const(passfail) right) const pure nothrow @nogc
+    {
+        mixin("return passfail(this._passed " ~ op ~ " right._passed);");
+    }
+    passfail opBinary(string op)(const(bool) right) const pure nothrow @nogc
+    {
+        mixin("return passfail(this._passed " ~ op ~ " right);");
+    }
+    passfail opBinaryRight(string op)(const(bool) left) const pure nothrow @nogc
+    {
+        mixin("return passfail(left " ~ op ~ " this._passed);");
+    }
 }
-@property auto passed(const(passfail) pf) { return pf._passed; }
-@property auto failed(const(passfail) pf) { return !pf._passed; }

@@ -1,389 +1,662 @@
-module more.net_old;
+module more.net;
 
-import std.bitmanip;
-import std.conv;
-import std.container;
-import std.stdio;
-import std.socket;
-import std.string;
+static import core.stdc.string;
 
-import core.stdc.stdlib;
-import core.thread;
+import std.format : format, formattedWrite;
+import std.bitmanip : nativeToBigEndian;
+import std.typecons : Flag, Yes, No;
 
-import more.common;
-
-/**
-   The maximum number of ascii characters of a domain name.
-   Note: includes delimiting dots but not a trailing dot.
-*/
-enum MAX_DOMAIN_NAME_ASCII_CHARS = 253;
-/**
-   The maximum number of a domain label, which is the string in between
-   the dots in a domain name.
- */
-enum MAX_DOMAIN_LABEL_ASCII_CHARS = 63;
-
-string tryRemoteAddressString(Socket sock)
+version(Windows)
 {
-  Address addr;
-  try {
-    addr = sock.remoteAddress();
-  } catch(Exception e) {
-    return "(unknown address)";
-  }
-  return addr.toString();
+    pragma (lib, "ws2_32.lib");
+    pragma (lib, "wsock32.lib");
+    import core.sys.windows.winbase :
+        BOOL,
+        GUID,
+        OVERLAPPED,
+        GetLastError;
+    import core.sys.windows.mswsock :
+        WSAID_ACCEPTEX, LPFN_ACCEPTEX;
+    static import core.sys.windows.winsock2;
+    import core.sys.windows.winsock2 :
+        AF_UNSPEC, AF_UNIX, AF_INET, AF_IPX, AF_APPLETALK, AF_INET6,
+        SOCK_STREAM, SOCK_DGRAM, SOCK_RAW, SOCK_RDM, SOCK_SEQPACKET,
+        IPPROTO_IP, IPPROTO_ICMP, IPPROTO_IGMP, IPPROTO_GGP, IPPROTO_TCP, IPPROTO_PUP,
+        IPPROTO_UDP, IPPROTO_IDP, IPPROTO_RAW, IPPROTO_IPV6,
+        WSADATA, WSAStartup, WSACleanup,
+        WSAGetLastError,
+        WSAOVERLAPPED, LPWSAOVERLAPPED_COMPLETION_ROUTINE,
+        //WSAIoctl,
+
+        // DNS
+        AI_NUMERICHOST,
+        addrinfo, /*getnameinfo, getaddrinfo, freeaddrinfo,*/
+
+        //closesocket, shutdown, bind, listen, ioctlsocket,
+        //connect, send, sendto, recv, recvfrom, socklen_t, accept,
+        //sockaddr, sockaddr_in, sockaddr_in6,
+        //getsockopt, setsockopt,
+        //ntohs, ntohl, htons, htonl,
+        //tcp_keepalive,
+        FIONBIO,
+        //fd_set, FD_SETSIZE, FD_ISSET,
+        timeval;
+        //SOL_SOCKET,
+        //SO_DEBUG, SO_BROADCAST, SO_REUSEADDR, SO_LINGER, SO_OOBINLINE, SO_SNDBUF,
+        //SO_RCVBUF, SO_DONTROUTE, SO_SNDTIMEO, SO_RCVTIMEO, SO_ERROR, SO_KEEPALIVE,
+        //SO_ACCEPTCONN, SO_RCVLOWAT, SO_SNDLOWAT, SO_TYPE,
+        //TCP_NODELAY,
+        //IPV6_UNICAST_HOPS, IPV6_MULTICAST_IF, IPV6_MULTICAST_LOOP,
+        //IPV6_MULTICAST_HOPS, IPV6_JOIN_GROUP, IPV6_LEAVE_GROUP, IPV6_V6ONLY,
+        //AI_PASSIVE, AI_CANONNAME, AI_NUMERICHOST,
+        //SD_RECEIVE, SD_SEND, SD_BOTH,
+        //MSG_OOB, MSG_PEEK, MSG_DONTROUTE,
+        //WSAEWOULDBLOCK, WSANO_DATA,
+        //NI_NUMERICHOST, NI_MAXHOST, NI_NUMERICSERV, NI_NAMEREQD, NI_MAXSERV,
+        //EAI_NONAME;
+}
+else version(Posix)
+{
+
+}
+else
+{
+    static assert(0, "unhandled platform");
 }
 
-interface ISocketConnector
+enum AddressFamily : ushort
 {
-  void connect(Socket socket, Address address);
-  //void connect(Socket socket, InternetAddress address);
+    unspecified = AF_UNSPEC,
+    unix        = AF_UNIX,
+    inet        = AF_INET,
+    inet6       = AF_INET6,
+    ipx         = AF_IPX,
+    appleTalk   = AF_APPLETALK,
 }
-//alias void delegate(Socket socket, Address address) SocketConnector;
-
-
-/// examples:
-///    http:<ip-or-host>:<port>
-///    socks5:<ip-or-host>:<port>
-ISocketConnector parseProxy(string proxyString)
+enum SocketType : int
 {
-  if(proxyString == null || proxyString.length <= 0) return null;
-
-  string[] splitStrings = split(proxyString, ":");
-  if(splitStrings.length != 3) throw new Exception("Proxy must have at least 2 colons");
-
-  string proxyTypeString = splitStrings[0];
-  string ipOrHostString  = splitStrings[1];
-  string portString      = splitStrings[2];
-
-  debug writefln("Proxy: '%s' Host: '%s' Port: '%s'", proxyTypeString, ipOrHostString, portString);
-
-  ushort port = to!ushort(portString);
-
-  if(proxyTypeString == "socks4") {
-    throw new Exception("Not implemented");
-  } else if(proxyTypeString == "socks5") {
-    return new Proxy5Connector(addressFromIPOrHost(ipOrHostString, port));
-  } else {
-    throw new Exception(format("Unknown proxy type '%s'", proxyTypeString));
-  }
+    stream    = SOCK_STREAM,
+    dgram     = SOCK_DGRAM,
+    raw       = SOCK_RAW,
+    rdm       = SOCK_RDM,
+    seqPacket = SOCK_SEQPACKET,
 }
-string parseConnector(string connectorString, out ISocketConnector connector)
+enum Protocol : int
 {
-  // Check for proxy
-  ptrdiff_t percentIndex = indexOf(connectorString, '%');
-  if(percentIndex == -1) {
-    connector = null;
-    return connectorString;
-  } else {
-    connector = parseProxy(connectorString[0..percentIndex]);
-    return connectorString[percentIndex+1..$];
-  }
+    raw  = IPPROTO_RAW,
+    udp  = IPPROTO_UDP,
+    tcp  = IPPROTO_TCP,
+    ip   = IPPROTO_IP,
+    ipv6 = IPPROTO_IPV6,
+    icmp = IPPROTO_ICMP,
+    igmp = IPPROTO_IGMP,
+    ggp  = IPPROTO_GGP,
+    pup  = IPPROTO_PUP,
+    idp  = IPPROTO_IDP,
 }
 
-Address addressFromIPOrHostAndPort(const(char)[] ipOrHostAndPort)
+version(Windows)
 {
-  ptrdiff_t colonIndex = indexOf(ipOrHostAndPort, ':');
+    //alias _ctimeval = core.sys.windows.winsock2.timeval;
+    //alias _clinger = core.sys.windows.winsock2.linger;
 
-  if(colonIndex == -1)
-    throw new Exception(format("ipOrHost '%s' is missing a colon to indicate the port", ipOrHostAndPort));
+    import std.windows.syserror : sysErrorString, GetModuleHandleA, GetProcAddress;
 
-  auto ipOrHost = ipOrHostAndPort[0..colonIndex];
-  auto port = to!ushort(ipOrHostAndPort[colonIndex+1..$]);
+    private immutable int _SOCKET_ERROR = core.sys.windows.winsock2.SOCKET_ERROR;
 
-  return addressFromIPOrHost(ipOrHost, port);
-}
+    alias socket_t = size_t;
+    enum invalidSocket = size_t.max;
+    alias socklen_t = int;
+    //enum socket_t : size_t;
 
-Address addressFromIPOrHostAndOptionalPort(string ipOrHostAndOptionalPort, ushort defaultPort)
-{
-  ptrdiff_t colonIndex = indexOf(ipOrHostAndOptionalPort, ':');
-
-  string ipOrHost;
-  ushort port;
-
-  if(colonIndex == -1) {
-    ipOrHost = ipOrHostAndOptionalPort;
-    port = defaultPort;
-  } else {
-    ipOrHost = ipOrHostAndOptionalPort[0..colonIndex];
-    port = to!ushort(ipOrHostAndOptionalPort[colonIndex+1..$]);
-  }
-
-  return addressFromIPOrHost(ipOrHost, port);
-}
-auto addressFromIPOrHost(const(char)[] ipOrHost, ushort port)
-{
-/+
-  debug writefln("Parsing Address '%s' (port=%s)", ipOrHost, port);
-  Address addr = parseAddress(ipOrHost, port);
-  debug writeln("done");
-  return addr;
-+/
-  //return parseAddress(ipOrHost, port);
-  return new InternetAddress(ipOrHost, port);
-}
-
-
-void receiveAll(Socket socket, ubyte[] buffer)
-{
-  ptrdiff_t lastBytesRead;
-  do {
-    lastBytesRead = socket.receive(buffer);
-    buffer = buffer[lastBytesRead..$];
-    if(buffer.length <= 0) return;
-  } while(lastBytesRead > 0);
-  throw new Exception("socket closed but still expected more data");
-}
-
-
-
-class Proxy5Connector : ISocketConnector
-{
-  Address proxyAddress;
-  this(Address proxyAddress) {
-    this.proxyAddress = proxyAddress;
-  }
-  public void connect(Socket socket, Address address)
-  {
-    InternetAddress inetAddress = cast(InternetAddress)address;
-
-    if(!(inetAddress is null)) {
-      proxy5connect(socket, proxyAddress, inetAddress);
-      return;
+    alias sysresult_t = int;
+    @property bool failed(sysresult_t result)
+    {
+        return result != 0;
+    }
+    @property bool success(sysresult_t result)
+    {
+        return result == 0;
     }
 
-    throw new Exception(format("The Proxy5 connector does not handle addresses of type '%s'", typeid(address)));
-  }
-}
-
-
-void proxy5connect(Socket socket, Address proxy, InternetAddress address)
-{
-  debug writefln("Proxy5: Final Destination: '%s'", address);
-
-  ubyte buffer[21];
-
-  debug writefln("Connecting to Proxy '%s'", proxy);
-  socket.connect(proxy);
-  debug writeln("Connected");
-
-  //
-  // Send initial greeting
-  //
-  buffer[0] = 5; // SOCKS version 5
-  buffer[1] = 1; // 1 Authentication protocol
-  buffer[2] = 0; // No authentication
-  debug writeln("Proxy5: Sending initial greeting...");
-  socket.send(buffer[0..3]);
-
-  //
-  // Get response
-  //
-  debug writeln("Proxy5: Receiving response...");
-  socket.receiveAll(buffer[0..2]);
-  if(buffer[0] != 5) throw new Exception("The given proxy does not support SOCKS version 5");
-  if(buffer[1] != 0) throw new Exception("Server does not support NO_AUTHENTICATION");
-
-  //
-  // Send CONNECT command
-  //
-  buffer[0] = 5; // SOCKS version 5
-  buffer[1] = 1; // CONNECT command
-  buffer[2] = 0; // Reserved
-
-  uint ip = address.addr();
-  debug writeln("Converting address to big endian...");
-  ubyte[4] ipNetworkOrder = nativeToBigEndian(ip);
-  debug writeln("Done");
-  buffer[3] = 1; // IPv4 address
-  buffer[4] = ipNetworkOrder[0];
-  buffer[5] = ipNetworkOrder[1];
-  buffer[6] = ipNetworkOrder[2];
-  buffer[7] = ipNetworkOrder[3];
-
-  ushort port = address.port();
-  buffer[8] = cast(ubyte)(port >> 8);
-  buffer[9] = cast(ubyte)(port     );
-  debug writeln("Proxy5: Sending CONNECT");
-  socket.send(buffer[0..10]);
-
-  //
-  // Get final response
-  //
-  socket.receiveAll(buffer[0..10]);
-  if(buffer[1] != 0) throw new Exception("Proxy server failed to connect to host");
-}
-
-
-
-
-
-class TunnelThread : Thread
-{
-  public Socket socketA, socketB;
-  this()
-  {
-    super( &run );
-  }
-  void run() {
-    SocketSet selectSockets;
-    ubyte[] buffer = new ubyte[1024];
-
-    while(true) {
-      selectSockets.add(socketA);
-      selectSockets.add(socketB);
-
-      Socket.select(selectSockets, null, null);
-
-      ptrdiff_t bytesRead;
-      if(selectSockets.isSet(socketA)) {
-        bytesRead = socketA.receive(buffer);
-        if(bytesRead == 0) {
-          socketB.shutdown(SocketShutdown.BOTH);
-          break;
-        }
-        socketB.send(buffer);
-      }
-      if(selectSockets.isSet(socketB)) {
-        bytesRead = socketB.receive(buffer);
-        if(bytesRead == 0) {
-          socketA.shutdown(SocketShutdown.BOTH);
-          break;
-        }
-        socketA.send(buffer);
-      }
+    int lastError()
+    {
+        return GetLastError();
     }
-    socketA.close();
-    socketB.close();
-  }
-}
 
-struct Tunnels
-{
-  public static void add(Socket socketA, Socket socketB)
-  {
-    TunnelThread tunnel;
-    tunnel.socketA = socketA;
-    tunnel.socketB = socketB;
-    tunnel.start();
-  }
-}
+    private extern(Windows) socket_t socket(int af, SocketType type, Protocol protocol) nothrow @nogc;
 
+    enum SD_RECEIVE = 0;
+    enum SD_SEND    = 1;
+    enum SD_BOTH    = 2;
+    enum Shutdown
+    {
+      recv = SD_RECEIVE,
+      send = SD_SEND,
+      both = SD_BOTH,
+    }
+    extern(Windows) sysresult_t shutdown(socket_t sock, Shutdown how);
+    extern(Windows) int closesocket(socket_t);
 
-struct TcpSocketPair {
-  Socket socketA, socketB;
-}
+    extern(Windows) sysresult_t bind(socket_t sock, const(sockaddr)* addr, uint addrlen);
+    extern(Windows) sysresult_t connect(socket_t sock, const(sockaddr)* addr, uint addrlen);
 
-alias void delegate(ISocketSelector selector, Socket socket) SocketHandler;
+    extern(Windows) sysresult_t listen(socket_t sock, uint backlog);
 
-// Called with null if the socket was closed
-alias void delegate(ISocketSelector selector, ref DataSocketAndHandler handler, ubyte[] data) DataSocketHandler;
+    extern(Windows) socket_t WSAAccept(socket_t sock, sockaddr* addr, uint* addrlen, void*, void*);
+    extern(Windows) socket_t accept(socket_t sock, sockaddr* addr, socklen_t* addrlen);
 
+    extern(Windows) sysresult_t getsockname(socket_t sock, sockaddr* addr, uint* namelen);
 
-interface ISocketSelector
-{
-  void addSocket(Socket socket, SocketHandler handler);
-  void addDataSocket(Socket socket, DataSocketHandler handler);
-}
+    extern(Windows) sysresult_t ioctlsocket(socket_t sock, uint cmd, void* arg);
+    extern(Windows) sysresult_t WSAIoctl(socket_t sock, uint code,
+        void* inBuffer, uint inBufferLength,
+        void* outBuffer, uint outBufferLength,
+        uint* bytesReturned, WSAOVERLAPPED* overlapped, LPWSAOVERLAPPED_COMPLETION_ROUTINE completionRoutine);
 
-struct SocketAndHandler
-{
-  public Socket socket;
-  public SocketHandler handler;
-}
+    extern(Windows) int recv(socket_t sock, ubyte* buffer, uint len, uint flags);
+    extern(Windows) int send(socket_t sock, const(ubyte)* buffer, uint len, uint flags);
 
-struct DataSocketAndHandler
-{
-  public Socket socket;
-  public DataSocketHandler handler;
-}
+    extern(Windows) int recvfrom(socket_t sock, ubyte* buffer, uint len, uint flags, sockaddr* from, uint* fromlen);
+    extern(Windows) int sendto(socket_t sock, const(ubyte)* buffer, uint len, uint flags, const(sockaddr)* to, uint tolen);
 
-/// You cannot manually remove data sockets, they must be shutdown to be removed.
-/// This is so the select loops will not be messed up.
-class SimpleSelector : Thread, ISocketSelector
-{
-  const size_t bufferSize;
-  ArrayList!SocketAndHandler handlers;
-  ArrayList!DataSocketAndHandler dataHandlers;
-  public this(T)(size_t bufferSize, T initialHandlers)
-  {
-    super(&run);
-    this.bufferSize = bufferSize;
-    this.handlers = ArrayList!SocketAndHandler(initialHandlers);
-    this.dataHandlers = ArrayList!(DataSocketAndHandler)(16);
-  }
-
-  /// Note: this method must add the socket to the end of the socket list
-  ///       in order to not mess up the select loop
-  void addSocket(Socket socket, SocketHandler handler)
-  {
-    SocketAndHandler s = SocketAndHandler(socket, handler);
-    handlers.put(s);
-  }
-  /// Note: this method must add the socket to the end of the socket list
-  ///       in order to not mess up the select loop
-  void addDataSocket(Socket socket, DataSocketHandler handler)
-  {
-    DataSocketAndHandler s = DataSocketAndHandler(socket, handler);
-    dataHandlers.put(s);
-    debug{writefln("Added DataSocket '%s' (%s total data sockets)", socket.tryRemoteAddressString(), dataHandlers.count); stdout.flush();}
-  }
-  void run()
-  {
-    ubyte[] buffer = new ubyte[bufferSize];
-    //ubyte[] buffer = (cast(ubyte*)alloca(bufferSize))[0..bufferSize];
-
-    SocketSet selectSockets = new SocketSet();
-    ptrdiff_t bytesRead;
-    int socketsAffected;
-
-  SELECT_LOOP_START:
-    while(true) {
-      selectSockets.reset();
-      foreach(i; 0..handlers.count) {
-        selectSockets.add(handlers.array[i].socket);
-      }
-      foreach(i; 0..dataHandlers.count) {
-        selectSockets.add(dataHandlers.array[i].socket);
-      }
-
-      socketsAffected = Socket.select(selectSockets, null, null);
-
-      if(socketsAffected <= 0) throw new Exception(format("Select returned %s but no timeout was specified", socketsAffected));
-
-      // Handle regular sockets
-      foreach(i; 0..handlers.count) {
-        SocketAndHandler handler = handlers.array[i];
-        if(selectSockets.isSet(handler.socket)) {
-          handler.handler(this, handler.socket);
-          socketsAffected--;
-          if(socketsAffected == 0) goto SELECT_LOOP_START;
+    struct fd_set
+    {
+        uint fd_count;
+        union
+        {
+            socket_t[0] fd_array_0;
+            socket_t fd_array_first;
         }
-      }
-      // Handle data sockets
-      for(size_t i = 0; i < dataHandlers.count; i++) {
-        auto socket = dataHandlers.array[i].socket;
-        if(selectSockets.isSet(socket)) {
-          bytesRead = socket.receive(buffer);
-          if(bytesRead <= 0) {
-            dataHandlers.array[i].handler(this, dataHandlers.array[i], null);
-            dataHandlers.removeAt(i);
-            i--;
-            debug{writefln("Removed DataSocket '%s' (%s data sockets left)", socket.tryRemoteAddressString(), dataHandlers.count);stdout.flush();}
-          } else {
-            debug{writefln("Received %s bytes", bytesRead);stdout.flush();}
-            dataHandlers.array[i].handler(this, dataHandlers.array[i], buffer[0..bytesRead]);
-            if(dataHandlers.array[i].handler is null) {
-              try { socket.shutdown(SocketShutdown.BOTH); } catch { }
-              try { socket.close(); } catch { }
-              dataHandlers.removeAt(i);
-              i--;
+        inout(socket_t)* fd_array() inout
+        {
+            return &fd_array_first;
+        }
+    }
+    struct fd_set_storage(size_t size)
+    {
+        uint fd_count;
+        socket_t[size] fd_array;
+        @property fd_set* ptr()
+        {
+            return cast(fd_set*)&this;
+        }
+        void addNoCheck(socket_t sock)
+        {
+            fd_array[fd_count++] = sock;
+        }
+    }
+
+    struct fd_set_dynamic(Allocator)
+    {
+        static size_t fdCountToMemSize(uint fd_count)
+        {
+            return uint.sizeof + fd_count * socket_t.sizeof;
+        }
+        static uint memSizeToFdCount(size_t memSize)
+        {
+            if(memSize == 0) return 0;
+            return cast(uint)((memSize - uint.sizeof) / socket_t.sizeof);
+        }
+
+        //static assert(hasMember!(Expander, "expand"), Expander.stringof~" does not have an expand function");
+        private fd_set* set;
+        private uint fd_capacity;
+        @property fd_set* ptr()
+        {
+            return set;
+        }
+        void reset()
+        {
+            if(set)
+            {
+                set.fd_count = 0;
             }
-          }
-          socketsAffected--;
-          if(socketsAffected == 0) goto SELECT_LOOP_START;
         }
-      }
+        void addNoCheck(socket_t sock)
+        {
+            import more.alloc : Mem;
+
+            if(set is null)
+            {
+                auto mem = Allocator.alloc(Mem(null, 0), fdCountToMemSize(1));
+                this.set = cast(fd_set*)mem.ptr;
+                this.fd_capacity = memSizeToFdCount(mem.size);
+                assert(this.fd_capacity >= 1);
+                this.set.fd_count = 1;
+                this.set.fd_array_first = sock;
+            }
+            else
+            {
+                if(set.fd_count >= fd_capacity)
+                {
+                    auto currentMemSize = fdCountToMemSize(fd_capacity);
+                    auto mem = Allocator.alloc(Mem(set, currentMemSize), fdCountToMemSize(fd_capacity + 1), 0, currentMemSize);
+                    this.set = cast(fd_set*)mem.ptr;
+                    auto newFdCapacity =  memSizeToFdCount(mem.size);
+                    assert(newFdCapacity > this.fd_capacity);
+                    this.fd_capacity = newFdCapacity;
+                }
+                (&set.fd_array_first)[set.fd_count++] = sock;
+            }
+        }
     }
-  }
+    extern(Windows) int select(int ignore, fd_set* readfds, fd_set* writefds, fd_set* exceptfds, timeval* timeout);
+
+    socket_t createsocket(AddressFamily family, SocketType type, Protocol protocol)
+    {
+        return socket(family, type, protocol);
+    }
+
+    /*
+     * Commands for ioctlsocket(),  taken from the BSD file fcntl.h.
+     *
+     *
+     * Ioctl's have the command encoded in the lower word,
+     * and the size of any in or out parameters in the upper
+     * word.  The high 2 bits of the upper word are used
+     * to encode the in/out status of the parameter; for now
+     * we restrict parameters to at most 128 bytes.
+     */
+    enum IOCPARM_MASK =  0x7f;            /* parameters must be < 128 bytes */
+    enum IOC_VOID     =  0x20000000;      /* no parameters */
+    enum IOC_OUT      =  0x40000000;      /* copy out parameters */
+    enum IOC_IN       =  0x80000000;      /* copy in parameters */
+    enum IOC_INOUT    =  IOC_IN | IOC_OUT;
+                                            /* 0x20000000 distinguishes new &
+                                               old ioctl's */
+    uint _WSAIO(uint x, uint y)   { return IOC_VOID  | x | y; }
+    uint _WSAIOR(uint x, uint y)  { return IOC_OUT   | x | y; }
+    uint _WSAIOW(uint x, uint y)  { return IOC_IN    | x | y; }
+    uint _WSAIORW(uint x, uint y) { return IOC_INOUT | x | y; }
+
+    enum IOC_WS2 = 0x08000000;
+    enum SIO_GET_EXTENSION_FUNCTION_POINTER = _WSAIORW(IOC_WS2, 6);
+
+    LPFN_ACCEPTEX loadAcceptEx(socket_t socket)
+    {
+        LPFN_ACCEPTEX functionPointer = null;
+        GUID acceptExGuid = WSAID_ACCEPTEX;
+        uint bytes;
+        if(failed(WSAIoctl(socket, SIO_GET_EXTENSION_FUNCTION_POINTER,
+            &acceptExGuid, acceptExGuid.sizeof,
+            &functionPointer, functionPointer.sizeof, &bytes, null, null)))
+        {
+            return null;
+        }
+        assert(functionPointer, "WSAIoctl SIO_GET_EXTENSION_FUNCTION_POINTER returned success but function pointer is null");
+        return functionPointer;
+    }
+
+
+}
+else version(Posix)
+{
+    alias sysresult_t = int;
+    @property bool failed(sysresult_t result)
+    {
+        return result != 0;
+    }
+    @property bool success(sysresult_t result)
+    {
+        return result == 0;
+    }
+    version(linux)
+    {
+        enum : int
+        {
+            TCP_KEEPIDLE  = 4,
+            TCP_KEEPINTVL = 5
+        }
+    }
+
+    import core.sys.posix.netdb;
+    import core.sys.posix.sys.un : sockaddr_un;
+    private import core.sys.posix.fcntl;
+    private import core.sys.posix.unistd;
+    private import core.sys.posix.arpa.inet;
+    private import core.sys.posix.netinet.tcp;
+    private import core.sys.posix.netinet.in_;
+    private import core.sys.posix.sys.time;
+    private import core.sys.posix.sys.select;
+    private import core.sys.posix.sys.socket;
+    private alias _ctimeval = core.sys.posix.sys.time.timeval;
+    private alias _clinger = core.sys.posix.sys.socket.linger;
+
+    private import core.stdc.errno;
+
+    alias socket_t = int;
+    enum invalidSocket = -1;
+    alias socklen_t = int;
+
+    enum Shutdown
+    {
+      recv = SHUT_RD,
+      send = SHUT_WR,
+      both = SHUT_RDWR,
+    }
+
+    int lastError() nothrow @nogc
+    {
+        return errno;
+    }
+
+    socket_t createsocket(AddressFamily family, SocketType type, Protocol protocol)
+    {
+        return socket(family, type, protocol);
+    }
+    void closesocket(socket_t sock)
+    {
+      close(sock);
+    }
+    extern(C) sysresult_t bind(socket_t sock, const(sockaddr)* addr, socklen_t addrlen);
+    extern(C) sysresult_t listen(socket_t sock, uint backlog);
+    extern(C) socket_t accept(socket_t sock,  const(sockaddr)* addr, socklen_t* addrlen);
+    extern(C) ptrdiff_t recv(socket_t sock, ubyte* buffer, size_t len, uint flags);
+    extern(C) ptrdiff_t send(socket_t sock, const(ubyte)* buffer, size_t len, uint flags);
+    extern(C) sysresult_t getpeername(socket_t sock, sockaddr* addr, socklen_t* addrlen);
+    extern(C) sysresult_t shutdown(socket_t sock, Shutdown how);
+
+    struct addrinfo
+    {
+        uint      ai_flags;
+        uint      ai_family;
+        uint      ai_socktype;
+        uint      ai_protocol;
+        socklen_t ai_addrlen;
+        sockaddr* ai_addr;
+        char*     ai_canonname;
+        addrinfo* ai_next;
+    }
+    extern(C) sysresult_t getaddrinfo(const(char)* node, const(char)* service,
+        const(addrinfo)* hints, addrinfo** res);
+}
+else
+{
+    static assert(0, "unhandled platform");
+}
+
+version(Windows)
+{
+    private immutable typeof(&core.sys.windows.winsock2.getnameinfo) getnameinfoPointer;
+    private immutable typeof(&core.sys.windows.winsock2.getaddrinfo) getaddrinfoPointer;
+    private immutable typeof(&core.sys.windows.winsock2.freeaddrinfo) freeaddrinfoPointer;
+}
+
+shared static this() @system
+{
+    version(Windows)
+    {
+        {
+            WSADATA wsaData;
+            int result = WSAStartup(0x2020, &wsaData);
+            assert(result == 0, format("WSAStartup failed (returned %s)", result));
+        }
+
+        // Load method extensions
+
+
+        // These functions may not be present on older Windows versions.
+        // See the comment in InternetAddress.toHostNameString() for details.
+        auto ws2Lib = GetModuleHandleA("ws2_32.dll");
+        //assert(ws2Lib, format("GetModuleHandleA(\"ws2_32.dll\") failed error=%s", WSAGetLastError()));
+        if (ws2Lib)
+        {
+            getnameinfoPointer = cast(typeof(getnameinfoPointer))
+                                 GetProcAddress(ws2Lib, "getnameinfo");
+            getaddrinfoPointer = cast(typeof(getaddrinfoPointer))
+                                 GetProcAddress(ws2Lib, "getaddrinfo");
+            freeaddrinfoPointer = cast(typeof(freeaddrinfoPointer))
+                                 GetProcAddress(ws2Lib, "freeaddrinfo");
+        }
+    }
+    else version(Posix)
+    {
+        /*
+        getnameinfoPointer = &getnameinfo;
+        getaddrinfoPointer = &getaddrinfo;
+        freeaddrinfoPointer = &freeaddrinfo;
+        */
+    }
+}
+
+shared static ~this() @system nothrow @nogc
+{
+    version(Windows)
+    {
+        WSACleanup();
+    }
+}
+
+alias in_port_t = ushort;
+
+bool isInvalid(socket_t sock)
+{
+    return sock == invalidSocket;
+}
+T ntohs(T)(T value) if(T.sizeof == 2)
+{
+    auto result = nativeToBigEndian(value);
+    return *(cast(T*)&result);
+}
+T htons(T)(T value) if(T.sizeof == 2)
+{
+    auto result = nativeToBigEndian(value);
+    return *(cast(T*)&result);
+}
+ushort htons(ushort value)
+{
+    auto result = nativeToBigEndian(value);
+    return *(cast(ushort*)&result);
+}
+T ntohl(T)(T value) if(T.sizeof == 4)
+{
+    auto result = nativeToBigEndian(value);
+    return *(cast(T*)&result);
+}
+T htonl(T)(T value) if(T.sizeof == 4)
+{
+    auto result = nativeToBigEndian(value);
+    return *(cast(T*)&result);
+}
+
+
+struct in_addr
+{
+    @property static in_addr any() { return in_addr(0); }
+    uint s_addr;
+}
+struct in6_addr
+{
+    @property static in6_addr any() { return in6_addr(); }
+    ubyte[16] s6_addr;
+}
+
+union inet_addr
+{
+    in_addr ipv4;
+    in6_addr ipv6;
+}
+
+
+struct sockaddr
+{
+    AddressFamily sa_family;
+    char[14] sa_data;
+    /*
+    static void assign(sockaddr* dst, sockaddr* src)
+    {
+        auto size = sockaddrsize(src.sa_family);
+        (cast(ubyte*)dst)[0..size] == (cast(ubyte*)src)[0..size];
+    }
+    */
+}
+struct sockaddr_in
+{
+    AddressFamily sin_family;
+    in_port_t    sin_port;
+    in_addr      sin_addr;
+    version(Windows)
+    {
+        char[] sin_zero;
+    }
+    bool equals(ref const(sockaddr_in) other) const
+    {
+        return sin_port == other.sin_port &&
+            sin_addr.s_addr == other.sin_addr.s_addr;
+    }
+    void toString(scope void delegate(const(char)[]) sink) const
+    {
+        assert(sin_family == AddressFamily.inet);
+        auto addr = ntohl(sin_addr.s_addr);
+        formattedWrite(sink, "%s.%s.%s.%s:%s",
+                      (addr >> 24),
+                      (addr >> 16) & 0xFF,
+                      (addr >>  8) & 0xFF,
+                      (addr >>  0) & 0xFF,
+                      ntohs(sin_port));
+    }
+}
+struct sockaddr_in6
+{
+    AddressFamily sin6_family;
+    in_port_t   sin6_port;
+    uint        sin6_flowinfo;
+    in6_addr    sin6_addr;
+    uint        sin6_scope_id;
+}
+
+private enum INET6_ADDRSTRLEN = 46;
+
+// a sockaddr meant to hold either an ipv4 or ipv6 socket address.
+union inet_sockaddr
+{
+    struct
+    {
+        AddressFamily family;
+        in_port_t in_port;
+    }
+    sockaddr     sa;
+    sockaddr_in  ipv4;
+    sockaddr_in6 ipv6;
+    this(const in_port_t sin_port, in_addr sin_addr)
+    {
+        ipv4.sin_family = AddressFamily.inet;
+        ipv4.sin_port   = sin_port;
+        ipv4.sin_addr   = sin_addr;
+    }
+    this(const in_port_t sin6_port, in6_addr sin6_addr)
+    {
+        ipv4.sin_family = AddressFamily.inet6;
+        ipv6.sin6_port   = sin6_port;
+        ipv6.sin6_addr   = sin6_addr;
+    }
+    void toString(scope void delegate(const(char)[]) sink) const
+    {
+        if(family == AddressFamily.inet)
+        {
+            ipv4.toString(sink);
+        }
+        else if(family == AddressFamily.inet6)
+        {
+            char[INET6_ADDRSTRLEN] str;
+            version(Windows)
+            {
+                assert(0, "inet_sockaddr ipv6 toString not implemented");
+            }
+            else
+            {
+                assert(inet_ntop(AddressFamily.inet6, &ipv6.sin6_addr, str.ptr, str.length),
+                    format("inet_ntop failed (e=%s)", lastError()));
+            }
+            formattedWrite(sink, "[%s]:%s", str.ptr[0..core.stdc.string.strlen(str.ptr)], ntohs(in_port));
+        } else {
+          formattedWrite(sink, "<unknown_family:%s>", family);
+        }
+    }
+    bool equals(ref const(inet_sockaddr) other) const
+    {
+        if(family != other.family || in_port != other.in_port)
+            return false;
+        if(family == AddressFamily.inet) {
+            return ipv4.sin_addr.s_addr == other.ipv4.sin_addr.s_addr;
+        } else if(family == AddressFamily.inet6) {
+            assert(0, "not implemented");
+        } else {
+            assert(0, "not currently handled");
+        }
+    }
+}
+
+
+pragma(inline)
+sysresult_t bind(T)(socket_t sock, const(T)* addr)
+    if( is(T == inet_sockaddr) || is(T == sockaddr_in) /* add more types */ )
+{
+    return bind(sock, cast(sockaddr*)addr, T.sizeof);
+}
+pragma(inline)
+sysresult_t connect(T)(socket_t sock, const(T)* addr)
+    if( is(T == inet_sockaddr) || is(T == sockaddr_in) /* add more types */ )
+{
+    return connect(sock, cast(sockaddr*)addr, T.sizeof);
+}
+pragma(inline)
+socket_t accept(T)(socket_t sock, T* addr)
+    if( is(T == inet_sockaddr) || is(T == sockaddr_in) /* add more types */ )
+{
+    socklen_t fromlen = T.sizeof;
+    return accept(sock, cast(sockaddr*)addr, &fromlen);
+}
+pragma(inline)
+auto send(T)(socket_t sock, const(T)* buffer, size_t len, uint flags = 0)
+    if(T.sizeof == 1 && !is(T == ubyte))
+{
+    return send(sock, cast(const(ubyte)*)buffer, len, flags);
+}
+pragma(inline)
+auto send(T)(socket_t sock, const(T)[] buffer, uint flags = 0)
+    if(T.sizeof == 1)
+{
+    return send(sock, cast(const(ubyte)*)buffer, buffer.length, flags);
+}
+pragma(inline)
+auto recv(T)(socket_t sock, T* buffer, uint len, uint flags = 0)
+    if(T.sizeof == 1 && !is(T == ubyte))
+{
+    return recv(sock, cast(ubyte*)buffer, len, flags);
+}
+pragma(inline)
+auto recv(T)(socket_t sock, T[] buffer, uint flags = 0)
+    if(T.sizeof == 1)
+{
+    return recv(sock, cast(ubyte*)buffer.ptr, buffer.length, flags);
+}
+pragma(inline)
+auto recvfrom(T,U)(socket_t sock, T[] buffer, uint flags, U* from)
+    if(T.sizeof == 1 && is(U == inet_sockaddr) || is(U == sockaddr_in) /* add more types */ )
+{
+    uint fromlen = U.sizeof;
+    return recvfrom(sock, cast(ubyte*)buffer.ptr, buffer.length, flags, cast(sockaddr*)from, &fromlen);
+}
+pragma(inline)
+auto sendto(T,U)(socket_t sock, const(T)[] buffer, uint flags, const(U)* to)
+    if(T.sizeof == 1 && is(U == inet_sockaddr) || is(U == sockaddr_in) /* add more types */ )
+{
+    return sendto(sock, cast(const(ubyte)*)buffer.ptr, buffer.length, flags, cast(const(sockaddr)*)to, U.sizeof);
+}
+
+alias Blocking = Flag!"blocking";
+sysresult_t setMode(socket_t sock, Blocking blocking)
+{
+    version(Windows)
+    {
+        uint ioctlArg = blocking ? 0 : 0xFFFFFFFF;
+        return ioctlsocket(sock, FIONBIO, &ioctlArg);
+    }
+    else version(Posix)
+    {
+        int flags = fcntl(sock, F_GETFL, 0);
+        return fcntl(sock, F_SETFL, flags | O_NONBLOCK);
+    }
 }

@@ -1,6 +1,34 @@
 import dlang;
 
-dlang.run
+//dlang.run
+//{
+//    source "gendeps.d";
+//}
+
+dlang.compile "more"
 {
-    source "gendeps.d";
+    targetType staticLibrary;
+    source "more/alloc.d";
+    source "more/base64.d";
+    source "more/builder.d";
+    source "more/cgi.d";
+    source "more/common.d";
+    source "more/esb/package.d";
+    source "more/esb/parser.d";
+    source "more/fields.d";
+    source "more/file.d";
+    source "more/format.d";
+    source "more/httpparser.d";
+    source "more/net/sock.d";
+    source "more/os/posix/core.d";
+    source "more/os/posix/sock.d";
+    source "more/parse.d";
+    source "more/path.d";
+    source "more/repos.d";
+    source "more/rpm.d";
+    source "more/sha.d";
+    source "more/test.d";
+    source "more/types.d";
+    source "more/uri.d";
+    source "more/utf8.d";
 }
