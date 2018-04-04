@@ -1,4 +1,4 @@
-@call rdmd -debug -g gendeps.d checked
+@rund -debug -g gendeps.d checked
 @if ERRORLEVEL 1 exit /B 1
-@call rdmd -debug -g go.d %*
+@rund -debug -g go.d %*
 

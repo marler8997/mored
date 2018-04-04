@@ -1,3 +1,3 @@
 #!/bin/sh
-rdmd gendeps.d checked
-rdmd -debug -I.. go.d $@
+rund gendeps.d checked
+rund -debug -I.. go.d $@

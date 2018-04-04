@@ -1,1 +1,1 @@
-rdmd perf.d
+rund perf.d
