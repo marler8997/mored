@@ -1,9 +1,8 @@
 module more.os.windows.core;
 
-pragma(lib, "kernel32");
+import more.c : cint;
 
-alias cint = int;
-alias cuint = uint;
+pragma(lib, "kernel32");
 
 struct WindowsErrorCode
 {
@@ -29,7 +28,9 @@ extern(Windows) nothrow @nogc
     FARPROC GetProcAddress(HANDLE Module, const(char)* ProcName);
 }
 
-// Common return value for os functions
+/**
+Common return value for os functions.
+*/
 struct SysResult
 {
     private cint value;

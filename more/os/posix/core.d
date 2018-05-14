@@ -2,20 +2,15 @@ module more.os.posix.core;
 
 import more.types : passfail;
 
-alias cint = int;
-alias cuint = int;
-
-/*
-// Common return value for os functions
+/**
+Common return value for os functions.
+*/
 struct SysResult
 {
     private cint value;
     @property bool failed() const { return value != 0; }
     @property bool passed() const { return value == 0; }
 }
-*/
-
-
 
 /**
 The generic type that represents a system error code as returned

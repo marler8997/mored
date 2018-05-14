@@ -4,21 +4,24 @@ but may be slightly enhanced to take advantage of D semantics.
 */
 module more.os.windows.sock;
 
+import more.c : cint, cuint;
 import more.types : passfail;
 
 import more.os.windows.core :
-    cint, cuint, WindowsErrorCode, HANDLE,
+    WindowsErrorCode, HANDLE,
     GetModuleHandleA, GetProcAddress;
 import more.net.sock :
     AddressFamily, SocketType, Protocol,
-    ntohl, sockaddr, Blocking;
+    ntohl, sockaddr, SocketHandle,
+    SockResult, SockLengthResult, SendResult,
+    Blocking, fd_set;
 
 pragma (lib, "ws2_32.lib");
 pragma (lib, "wsock32.lib");
 
-private immutable __gshared typeof(&getnameinfo) getnameinfoPointer;
-private immutable __gshared typeof(&getaddrinfo) getaddrinfoPointer;
-private immutable __gshared typeof(&freeaddrinfo) freeaddrinfoPointer;
+immutable __gshared typeof(&getnameinfo) getnameinfoPointer;
+immutable __gshared typeof(&getaddrinfo) getaddrinfoPointer;
+immutable __gshared typeof(&freeaddrinfo) freeaddrinfoPointer;
 
 shared static this() @system
 {
@@ -29,7 +32,10 @@ shared static this() @system
         assert(result.passed, format("WSAStartup failed (returned %s)", result));
     }
 
-    // Load method extensions
+    getnameinfoPointer = &getnameinfo;
+    getaddrinfoPointer = &getaddrinfo;
+    freeaddrinfoPointer = &freeaddrinfo;
+/*
 
     // These functions may not be present on older Windows versions.
     // See the comment in InternetAddress.toHostNameString() for details.
@@ -44,6 +50,7 @@ shared static this() @system
         freeaddrinfoPointer = cast(typeof(freeaddrinfoPointer))
                              GetProcAddress(ws2Lib, "freeaddrinfo");
     }
+    */
 }
 
 shared static ~this() @system nothrow @nogc
@@ -232,45 +239,6 @@ struct WSADATA
     char* VendorInfo;
 }
 
-/**
-Represents a socket handle
-*/
-struct SocketHandle
-{
-    @property static SocketHandle invalidValue()
-    {
-        return SocketHandle(size_t.max);
-    }
-
-    private size_t value;
-    @property bool isInvalid() const
-    {
-        return value == invalidValue.value;
-    }
-}
-
-struct SockResult
-{
-    private cint value;
-    // NOTE: we could check that value == SOCKET_ERROR, however, if
-    //       a function returned neither 0 or SOCKET_ERROR, then we should
-    //       treat it as a failure.
-    @property bool failed() const { return value != 0; }
-    @property bool passed() const { return value == 0; }
-}
-struct SockLengthResult
-{
-    private cint value;
-    /**
-    NOTE: will return failed if return value is not positive
-    */
-    @property bool failed() const { return value < 0; }
-    @property cuint length() in { assert(!failed); } do
-    {
-        return cast(cuint)value;
-    }
-}
-
 struct WSAOVERLAPPED
 {
     uint* Internal;
@@ -292,11 +260,6 @@ struct WSAOVERLAPPED_COMPLETION_ROUTINE
     int placeholder;
 }
 
-struct addrinfo
-{
-    int placeholder;
-}
-
 extern(Windows) nothrow @nogc
 {
     WindowsErrorCode WSAStartup(ushort VersionRequested, WSADATA* lpWSAData);
@@ -304,7 +267,6 @@ extern(Windows) nothrow @nogc
 
     SocketHandle socket(cint af, cint type, cint protocol) nothrow @nogc;
     SockResult shutdown(SocketHandle sock, Shutdown how);
-    SockResult closesocket(SocketHandle);
 
     SockResult bind(SocketHandle sock, const(sockaddr)* addr, cuint addrlen);
     SockResult connect(SocketHandle sock, const(sockaddr)* addr, cuint addrlen);
@@ -344,33 +306,6 @@ enum Shutdown
   send = SD_SEND,
   both = SD_BOTH,
 }
-struct fd_set
-{
-    uint fd_count;
-    union
-    {
-        SocketHandle[0] fd_array_0;
-        SocketHandle fd_array_first;
-    }
-    inout(SocketHandle)* fd_array() inout
-    {
-        return &fd_array_first;
-    }
-}
-struct fd_set_storage(size_t size)
-{
-    uint fd_count;
-    SocketHandle[size] fd_array;
-    @property fd_set* ptr()
-    {
-        return cast(fd_set*)&this;
-    }
-    void addNoCheck(SocketHandle sock)
-    {
-        fd_array[fd_count++] = sock;
-    }
-}
-
 struct fd_set_dynamic(Allocator)
 {
     static size_t fdCountToMemSize(uint fd_count)
@@ -425,12 +360,6 @@ struct fd_set_dynamic(Allocator)
         }
     }
 }
-extern(Windows) int select(int ignore, fd_set* readfds, fd_set* writefds, fd_set* exceptfds, timeval* timeout);
-
-SocketHandle createsocket(AddressFamily family, SocketType type, Protocol protocol)
-{
-    return socket(family, type, protocol);
-}
 
 /*
  * Commands for ioctlsocket(),  taken from the BSD file fcntl.h.
@@ -474,8 +403,14 @@ LPFN_ACCEPTEX loadAcceptEx(SocketHandle socket)
 }
 +/
 
-passfail setMode(SocketHandle sock, Blocking blocking)
+struct addrinfo
 {
-    uint ioctlArg = blocking ? 0 : 0xFFFFFFFF;
-    return (0 == ioctlsocket(sock, FIONBIO, &ioctlArg)) ? passfail.pass : passfail.fail;
+    cint ai_flags;
+    cint ai_family;
+    cint ai_socktype;
+    cint ai_protocol;
+    size_t ai_addrlen;
+    char* ai_canonname;
+    sockaddr* ai_addr;
+    addrinfo* ai_next;
 }

@@ -1,7 +1,7 @@
-module more.socketserver;
+module more.net.socketserver;
 
 import std.traits : hasMember;
-import more.net;
+import more.net.sock;
 
 version(Windows)
 {
@@ -36,12 +36,11 @@ __gshared immutable selectSetProps = [
     immutable SelectSetProperties(EventFlags.error, "error"),
 ];
 
-
-struct SocketServer(H)
+struct SocketServerTemplate(Policy)
 {
     struct EventSocket
     {
-        socket_t handle;
+        SocketHandle handle;
         EventFlags flags;
 
         void function(EventSocket*) handler;
@@ -52,9 +51,15 @@ struct SocketServer(H)
         // The time when the timer expires
         TimerTime timerExpireTime;
 
-        static if( hasMember!(H, "EventSocketMixinTemplate") )
+        static if( hasMember!(Policy, "EventSocketMixinTemplate") )
         {
-            mixin H.EventSocketMixinTemplate;
+            mixin Policy.EventSocketMixinTemplate;
+        }
+
+        void setToRemove()
+        {
+            flags = EventFlags.none;
+            timer = NO_TIMER;
         }
 
         void updateTimerExpireTime()
@@ -67,21 +72,21 @@ struct SocketServer(H)
     }
 
     enum SET_COUNT =
-        cast(ubyte)H.ReadEvents +
-        cast(ubyte)H.WriteEvents +
-        cast(ubyte)H.ErrorEvents;
-    static if(H.ReadEvents)
+        cast(ubyte)Policy.ReadEvents +
+        cast(ubyte)Policy.WriteEvents +
+        cast(ubyte)Policy.ErrorEvents;
+    static if(Policy.ReadEvents)
     {
-        static if(H.WriteEvents)
+        static if(Policy.WriteEvents)
         {
-            static if(H.ErrorEvents)
+            static if(Policy.ErrorEvents)
                 __gshared immutable setIndexToSetPropIndex = [SelectSet.read, SelectSet.write, SelectSet.error];
             else
                 __gshared immutable setIndexToSetPropIndex = [SelectSet.read, SelectSet.write];
         }
         else
         {
-            static if(H.ErrorEvents)
+            static if(Policy.ErrorEvents)
                 __gshared immutable setIndexToSetPropIndex = [SelectSet.read, SelectSet.error];
             else
                 __gshared immutable setIndexToSetPropIndex = [SelectSet.read];
@@ -89,16 +94,16 @@ struct SocketServer(H)
     }
     else
     {
-        static if(H.WriteEvents)
+        static if(Policy.WriteEvents)
         {
-            static if(H.ErrorEvents)
+            static if(Policy.ErrorEvents)
                 __gshared immutable setIndexToSetPropIndex = [SelectSet.write, SelectSet.error];
             else
                 __gshared immutable setIndexToSetPropIndex = [SelectSet.write];
         }
         else
         {
-            static if(H.ErrorEvents)
+            static if(Policy.ErrorEvents)
                 __gshared immutable setIndexToSetPropIndex = [SelectSet.error];
             else
                 __gshared immutable setIndexToSetPropIndex = null;
@@ -109,9 +114,9 @@ struct SocketServer(H)
     {
         struct
         {
-            static if(H.ReadEvents)
+            static if(Policy.ReadEvents)
             {
-                fd_set_storage!(H.MaxSocketCount) readSet;
+                fd_set_storage!(Policy.MaxSocketCount) readSet;
                 @property fd_set* readSetPointer() { return readSet.ptr; }
             }
             else
@@ -119,9 +124,9 @@ struct SocketServer(H)
                 @property fd_set* readSetPointer() { return null; }
             }
 
-            static if(H.WriteEvents)
+            static if(Policy.WriteEvents)
             {
-                fd_set_storage!(H.MaxSocketCount) writeSet;
+                fd_set_storage!(Policy.MaxSocketCount) writeSet;
                 @property fd_set* writeSetPointer() { return writeSet.ptr; }
             }
             else
@@ -129,9 +134,9 @@ struct SocketServer(H)
                 @property fd_set* writeSetPointer() { return null; }
             }
 
-            static if(H.ErrorEvents)
+            static if(Policy.ErrorEvents)
             {
-                fd_set_storage!(H.MaxSocketCount) errorSet;
+                fd_set_storage!(Policy.MaxSocketCount) errorSet;
                 @property fd_set* errorSetPointer() { return errorSet.ptr; }
             }
             else
@@ -139,22 +144,22 @@ struct SocketServer(H)
                 @property fd_set* errorSetPointer() { return null; }
             }
         }
-        fd_set_storage!(H.MaxSocketCount)[SET_COUNT] sets;
+        fd_set_storage!(Policy.MaxSocketCount)[SET_COUNT] sets;
     }
 
-    EventSocket[H.MaxSocketCount] eventSockets;
+    EventSocket[Policy.MaxSocketCount] eventSockets;
     size_t reservedSocketCount;
 
     // Only call inside callbacks, or before calling run
     // TODO: add an option in H to say, canAddFromOtherThread
     //       if this is true then I can implement a locking mechanism
     // The socket gets added on the next loop iteration
-    void add(ref const EventSocket socket)
+    void add(const EventSocket socket)
     {
         eventSockets[reservedSocketCount++] = cast(EventSocket)socket;
     }
 
-    static if(H.ImplementStop)
+    static if(Policy.ImplementStop)
     {
         bool stopOnNextIteration;
         // The socket gets added on the next loop iteration
@@ -176,7 +181,7 @@ struct SocketServer(H)
             {
                 import std.stdio;
                 writefln("adding %s sockets (%s total)", reservedSocketCount - activeSocketCount, reservedSocketCount);
-                static if(H.TimerEvents)
+                static if(Policy.TimerEvents)
                 {
                     do
                     {
@@ -220,7 +225,7 @@ struct SocketServer(H)
                 break;
             }
 
-            static if(H.ImplementStop)
+            static if(Policy.ImplementStop)
             {
                 if(stopOnNextIteration)
                 {
@@ -238,17 +243,17 @@ struct SocketServer(H)
                 }
             }
             // TODO: maybe implement a stop feature, this
-            //       could be an option for H, something like, H.implementStop
+            //       could be an option for H, something like, Policy.implementStop
 
             // Setup the select call
-            static if(H.ReadEvents)
+            static if(Policy.ReadEvents)
                 socketSets.readSet.fd_count = 0;
-            static if(H.WriteEvents)
+            static if(Policy.WriteEvents)
                 socketSets.writeSet.fd_count = 0;
-            static if(H.ErrorEvents)
+            static if(Policy.ErrorEvents)
                 socketSets.errorSet.fd_count = 0;
 
-            static if(H.TimerEvents)
+            static if(Policy.TimerEvents)
             {
                 uint soonestTimerEvent = uint.max;
                 uint now;
@@ -256,28 +261,28 @@ struct SocketServer(H)
 
             for(uint i = 0; i < activeSocketCount; i++)
             {
-                static if(H.ReadEvents)
+                static if(Policy.ReadEvents)
                 {
                     if(eventSockets[i].flags & EventFlags.read)
                     {
                         socketSets.readSet.addNoCheck(eventSockets[i].handle);
                     }
                 }
-                static if(H.WriteEvents)
+                static if(Policy.WriteEvents)
                 {
                     if(eventSockets[i].flags & EventFlags.write)
                     {
                         socketSets.writeSet.addNoCheck(eventSockets[i].handle);
                     }
                 }
-                static if(H.ErrorEvents)
+                static if(Policy.ErrorEvents)
                 {
                     if(eventSockets[i].flags & EventFlags.error)
                     {
                         socketSets.errorSet.addNoCheck(eventSockets[i].handle);
                     }
                 }
-                static if(H.TimerEvents)
+                static if(Policy.TimerEvents)
                 {
                     if(eventSockets[i].timer != NO_TIMER)
                     {
@@ -318,7 +323,7 @@ struct SocketServer(H)
                 writeln();
             }
 
-            static if(H.TimerEvents)
+            static if(Policy.TimerEvents)
             {
                 timeval timeout;
                 if(soonestTimerEvent != uint.max)
@@ -385,7 +390,6 @@ struct SocketServer(H)
                             continue;
                         }
 
-
                         eventSockets[eventSocketIndex].handler(&eventSockets[eventSocketIndex]);
                         eventSockets[eventSocketIndex].updateTimerExpireTime();
                     }
@@ -393,7 +397,7 @@ struct SocketServer(H)
             }
 
             // Handle timer events
-            static if(H.TimerEvents)
+            static if(Policy.TimerEvents)
             {
                 if(soonestTimerEvent != uint.max)
                 {
@@ -405,7 +409,7 @@ struct SocketServer(H)
 
     // Returns: index on success, count on error
     // hint: contains the guess of where the next socket will be
-    uint findSocket(uint count, EventSocket[] eventSockets, socket_t handle, uint* hintReference)
+    uint findSocket(uint count, EventSocket[] eventSockets, SocketHandle handle, uint* hintReference)
     {
         enum checkHandleCode = q{
             if(handle == eventSockets[i].handle)

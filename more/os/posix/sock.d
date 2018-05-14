@@ -41,20 +41,8 @@ import more.net.sock :
     AddressFamily, SocketType, Protocol,
     ntohl, sockaddr, Blocking;
 
-/**
-SocketHandle is part of the public interface for sock
-*/
-alias SocketHandle = FileHandle;
 
 extern (C) nothrow @nogc
 {
     const(char)* inet_ntop(int addressFamily, const(void)* addr, char* dst, socklen_t size);
-}
-
-passfail setMode(SocketHandle sock, Blocking blocking)
-{
-    auto flags = fcntlGetFlags(sock);
-    if (flags.isInvalid)
-        return passfail.fail;
-    return fcntlSetFlags(sock, flags | O_NONBLOCK);
 }

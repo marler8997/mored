@@ -134,6 +134,7 @@ void asciiWriteEscaped(scope void delegate(const(char)[]) sink, const(char)* ptr
         {
             flush();
             sink.asciiWriteUnreadable(c);
+            flushPtr++;
         }
     }
     flush();

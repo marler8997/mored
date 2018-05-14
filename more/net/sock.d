@@ -1,3 +1,13 @@
+/**
+Contains a platform independent socket library.
+
+Use SocketHandle to represent a handle to a socket.
+
+This file should contain the public platform independent interface to the socket library.
+If you want platform dependent definitions, you can import more.net.os.<platform>.sock.
+
+Anything that can be exposed as platform-independent should be defined in this module.
+*/
 module more.net.sock;
 
 static import core.stdc.string;
@@ -7,24 +17,31 @@ import std.bitmanip : nativeToBigEndian;
 import std.typecons : Flag, Yes, No;
 import bitmanip = std.bitmanip;
 
+import more.types : passfail;
+import more.c : cint, cuint;
+import more.format : StringSink;
 version(Windows)
 {
     import more.os.windows.sock;
+    alias platform_sock = more.os.windows.sock;
+    public import more.os.windows.core : lastError;
 }
 else version(Posix)
 {
     import more.os.posix.sock;
+    alias platform_sock = more.os.windows.sock;
+    public import more.os.windows.core : lastError;
 }
 else static assert(0);
 
 enum AddressFamily : ushort
 {
-    unspecified = AF_UNSPEC,
-    unix        = AF_UNIX,
-    inet        = AF_INET,
-    inet6       = AF_INET6,
-    ipx         = AF_IPX,
-    appleTalk   = AF_APPLETALK,
+    unspec    = AF_UNSPEC,
+    unix      = AF_UNIX,
+    inet      = AF_INET,
+    inet6     = AF_INET6,
+    ipx       = AF_IPX,
+    appleTalk = AF_APPLETALK,
 }
 enum SocketType : int
 {
@@ -109,6 +126,10 @@ struct Port
 {
     private ushort value;
     ushort toUshort() const { return value; }
+    void toString(StringSink sink) const
+    {
+        formattedWrite(sink, "%s", toUshort);
+    }
 }
 pragma(inline) ushort toUshort(ushort value) { return value; }
 
@@ -210,71 +231,188 @@ union inet_sockaddr
     }
 }
 
+version (Windows)
+{
+    struct SocketHandle
+    {
+        @property static SocketHandle invalidValue()
+        {
+            return SocketHandle(size_t.max);
+        }
+
+        private size_t value;
+        @property bool isInvalid() const
+        {
+            return value == invalidValue.value;
+        }
+    }
+}
+else
+{
+    alias SocketHandle = FileHandle;
+}
+
+struct SockResult
+{
+    static SockResult pass() { return SockResult(0); }
+
+    private cint value;
+    // NOTE: we could check that value == SOCKET_ERROR, however, if
+    //       a function returned neither 0 or SOCKET_ERROR, then we should
+    //       treat it as a failure.
+    @property bool failed() const { return value != 0; }
+    @property bool passed() const { return value == 0; }
+}
+struct SockLengthResult
+{
+    private cint value;
+    /**
+    NOTE: will return failed if return value is not positive
+    */
+    @property bool failed() const { return value < 0; }
+    @property cuint length() in { assert(!failed); } do
+    {
+        return cast(cuint)value;
+    }
+}
+struct SendResult
+{
+    private SockLengthResult result;
+    private cuint expected;
+    @property bool failed() const { return result.failed; }
+    /**
+    NOTE: will return failed if return value is not positive
+    */
+    @property bool sentAll() const { return result.value == expected; }
+    @property auto sent() const { return result.value; }
+}
+
+SocketHandle createsocket(AddressFamily family, SocketType type, Protocol protocol)
+{
+    return socket(family, type, protocol);
+}
+
+version (Windows)
+{
+    extern(Windows) nothrow @nogc
+    {
+        SockResult closesocket(SocketHandle);
+    }
+}
+else
+{
+    static assert(0, "closesocket not declared for this OS");
+}
 
 pragma(inline)
-sysresult_t bind(T)(SocketHandle sock, const(T)* addr)
+auto bind(T)(SocketHandle sock, const(T)* addr)
     if( is(T == inet_sockaddr) || is(T == sockaddr_in) /* add more types */ )
 {
-    return bind(sock, cast(sockaddr*)addr, T.sizeof);
+    return platform_sock.bind(sock, cast(const(sockaddr)*)addr, T.sizeof);
 }
 pragma(inline)
-sysresult_t connect(T)(SocketHandle sock, const(T)* addr)
+auto connect(T)(SocketHandle sock, const(T)* addr)
     if( is(T == inet_sockaddr) || is(T == sockaddr_in) /* add more types */ )
 {
-    return connect(sock, cast(sockaddr*)addr, T.sizeof);
+    return platform_sock.connect(sock, cast(sockaddr*)addr, T.sizeof);
 }
 pragma(inline)
-SocketHandle accept(T)(SocketHandle sock, T* addr)
+auto accept(T)(SocketHandle sock, T* addr)
     if( is(T == inet_sockaddr) || is(T == sockaddr_in) /* add more types */ )
 {
     socklen_t fromlen = T.sizeof;
-    return accept(sock, cast(sockaddr*)addr, &fromlen);
+    return platform_sock.accept(sock, cast(sockaddr*)addr, &fromlen);
 }
 pragma(inline)
 auto send(T)(SocketHandle sock, const(T)* buffer, size_t len, uint flags = 0)
     if(T.sizeof == 1 && !is(T == ubyte))
 {
-    return send(sock, cast(const(ubyte)*)buffer, len, flags);
+    return platform_sock.send(sock, cast(const(ubyte)*)buffer, len, flags);
 }
 pragma(inline)
 auto send(T)(SocketHandle sock, const(T)[] buffer, uint flags = 0)
     if(T.sizeof == 1)
 {
-    return send(sock, cast(const(ubyte)*)buffer, buffer.length, flags);
+    return platform_sock.send(sock, cast(const(ubyte)*)buffer, buffer.length, flags);
 }
 pragma(inline)
 auto recv(T)(SocketHandle sock, T* buffer, uint len, uint flags = 0)
     if(T.sizeof == 1 && !is(T == ubyte))
 {
-    return recv(sock, cast(ubyte*)buffer, len, flags);
+    return platform_sock.recv(sock, cast(ubyte*)buffer, len, flags);
 }
 pragma(inline)
 auto recv(T)(SocketHandle sock, T[] buffer, uint flags = 0)
     if(T.sizeof == 1)
 {
-    return recv(sock, cast(ubyte*)buffer.ptr, buffer.length, flags);
+    return platform_sock.recv(sock, cast(ubyte*)buffer.ptr, buffer.length, flags);
 }
 pragma(inline)
 auto recvfrom(T,U)(SocketHandle sock, T[] buffer, uint flags, U* from)
     if(T.sizeof == 1 && is(U == inet_sockaddr) || is(U == sockaddr_in) /* add more types */ )
 {
     uint fromlen = U.sizeof;
-    return recvfrom(sock, cast(ubyte*)buffer.ptr, buffer.length, flags, cast(sockaddr*)from, &fromlen);
+    return platform_sock.recvfrom(sock, cast(ubyte*)buffer.ptr, buffer.length, flags, cast(sockaddr*)from, &fromlen);
 }
 pragma(inline)
 auto sendto(T,U)(SocketHandle sock, const(T)[] buffer, uint flags, const(U)* to)
     if(T.sizeof == 1 && is(U == inet_sockaddr) || is(U == sockaddr_in) /* add more types */ )
 {
-    return sendto(sock, cast(const(ubyte)*)buffer.ptr, buffer.length, flags, cast(const(sockaddr)*)to, U.sizeof);
+    auto sent = platform_sock.sendto(sock, cast(const(ubyte)*)buffer.ptr, buffer.length, flags, cast(const(sockaddr)*)to, U.sizeof);
+    return SendResult(sent, buffer.length);
 }
 
+struct fd_set
+{
+    uint fd_count;
+    union
+    {
+        SocketHandle[0] fd_array_0;
+        SocketHandle fd_array_first;
+    }
+    inout(SocketHandle)* fd_array() inout
+    {
+        return &fd_array_first;
+    }
+}
+struct fd_set_storage(size_t size)
+{
+    uint fd_count;
+    SocketHandle[size] fd_array;
+    @property fd_set* ptr()
+    {
+        return cast(fd_set*)&this;
+    }
+    void addNoCheck(SocketHandle sock)
+    {
+        fd_array[fd_count++] = sock;
+    }
+}
+version (Windows)
+{
+    extern(Windows) nothrow @nogc
+    {
+        // TODO: return value should by typed
+        int select(int ignore, fd_set* readfds, fd_set* writefds, fd_set* exceptfds, timeval* timeout);
+    }
+}
+
+
+
 alias Blocking = Flag!"blocking";
-version(Windows)
+
+passfail setMode(SocketHandle sock, Blocking blocking)
 {
-     public import more.os.windows.sock : setMode;
+    version (Windows)
+    {
+        uint ioctlArg = blocking ? 0 : 0xFFFFFFFF;
+        return ioctlsocket(sock, FIONBIO, &ioctlArg).passed ? passfail.pass : passfail.fail;
+    }
+    else
+    {
+        auto flags = fcntlGetFlags(sock);
+        if (flags.isInvalid)
+            return passfail.fail;
+        return fcntlSetFlags(sock, flags | O_NONBLOCK);
+    }
 }
-else version(Posix)
-{
-     public import more.os.posix.sock : setMode;
-}
-else static assert(0);
