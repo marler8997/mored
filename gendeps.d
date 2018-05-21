@@ -1,7 +1,7 @@
 #!/usr/bin/env rund
 import std.stdio : File, writeln, writefln;
 import std.format : format;
-import std.string : startsWith, replace;
+import std.string : startsWith, replace, endsWith;
 import std.array  : Appender;
 import std.file : dirEntries, SpanMode, mkdir, exists, timeLastModified;
 import std.path : dirName, buildPath, buildNormalizedPath, relativePath, baseName, stripExtension;
@@ -10,6 +10,16 @@ import std.typecons : Flag, Yes, No;
 
 import more.parse : skipSpace, startsWith, findCharIndex;
 
+auto stripPackage(string path)
+{
+    if (path.endsWith("package.d"))
+    {
+        auto temp = path[0 .. $ - "package.d".length];
+        if (temp.length > 0 && (temp[$ - 1] == '/' || temp[$ - 1] == '\\'))
+            return temp[0 .. $-1];
+    }
+    return path;
+}
 struct Module
 {
     string filename;
@@ -19,7 +29,7 @@ struct Module
     this(string filename)
     {
         this.filename = filename;
-        this.name = filename[moreRoot.length + 1 ..$].stripExtension.replace("/", "_").replace("\\", "_");
+        this.name = filename[moreRoot.length + 1 ..$].stripPackage.stripExtension.replace("/", "_").replace("\\", "_");
     }
 }
 enum DepType
@@ -70,7 +80,7 @@ int main(string[] args)
     foreach(entry; dirEntries(moreRoot, "*.d", SpanMode.breadth))
     {
         auto module_ = Module(entry.name.idup);
-        writefln("Getting dependencies for \"%s\"", module_.filename);
+        writefln("Getting dependencies for %s (%s)", module_.name, module_.filename);
         
         callCompilerToGetDeps(module_.filename, null, &module_.normalDeps);
         callCompilerToGetDeps(module_.filename, " -unittest", &module_.unittestDeps);

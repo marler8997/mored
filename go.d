@@ -1,3 +1,4 @@
+#!/usr/bin/env rund
 import std.stdio;
 import std.format : format;
 import std.string : indexOf;
@@ -12,7 +13,6 @@ import std.datetime;
 import more.common;
 import more.types;
 import moduledeps;
-
 
 enum ModuleState
 {
