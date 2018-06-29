@@ -162,7 +162,7 @@ unittest
                 writefln("test on line %s", line);
                 assert(0);
             }
-            debug writefln("decodeUtf8('%s')", decoded);
+            //debug writefln("decodeUtf8('%s')", decoded);
         }
     }
     void testInvalidUtf8(Utf8DecodeException.Type expectedError, inout(char)[] s, size_t line = __LINE__)

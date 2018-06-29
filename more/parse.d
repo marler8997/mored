@@ -45,6 +45,26 @@ unittest
     }
 }
 
+bool hasCharSet(string charSet)(const(char)* str, const(char)* limit)
+{
+    for(;; str++)
+    {
+        if (str >= limit)
+            return false;
+        auto c = *str;
+        foreach(charSetChar; charSet) {
+            if(c == charSetChar) {
+                return true;
+            }
+        }
+    }
+}
+pragma(inline)
+bool hasCharSet(string charSet)(const(char)[] str)
+{
+    return hasCharSet!charSet(str.ptr, str.ptr + str.length);
+}
+
 /**
 Iterates over the given string and returns a pointer to the first character that
 is not in the given $(D charSet).

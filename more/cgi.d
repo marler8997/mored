@@ -1,33 +1,54 @@
 module more.cgi;
 
+static import core.stdc.stdio;
 import core.stdc.string : strlen, strcpy, memmove;
 import core.time : MonoTime, Duration;
 import core.stdc.stdlib : alloca;
 
-import std.stdio : File, stdout, stderr, stdin;
+import std.typecons : Flag, Yes, No;
 import std.format : format, sformat;
 import std.string : startsWith, indexOf;
+import std.algorithm : canFind;
 import std.conv : text, to;
 import std.traits : hasMember;
 import std.typecons : tuple;
 import std.random : Random;
 import std.exception : ErrnoException;
+import std.stdio : File, stdout, stderr, stdin;
 
-import more.parse : hexValue, findCharPtr;
+import more.parse : hexValue, findCharPtr, skipCharSet;
 import more.format : formatEscapeByPolicy, formatEscapeSet, asciiFormatEscaped;
 public import more.format : formatHex;
 public import more.uri : uriDecode;
 
-void log(T...)(const(char)[] fmt, T args)
+version = ToLogFile;
+version (ToLogFile)
 {
-    static if(T.length == 0)
+    private __gshared bool logFileOpen = false;
+    private __gshared File logFile;
+}
+
+void logf(T...)(const(char)[] fmt, T args)
+{
+    version (ToLogFile)
     {
-        stderr.writeln(fmt);
+        if (!logFileOpen)
+        {
+            logFile = File("/tmp/log", "a");
+            import std.datetime;
+            logFile.writefln("---------------- %s -----------------------", Clock.currTime);
+            logFileOpen = true;
+        }
+        logFile.writefln(fmt, args);
+        logFile.flush();
     }
-    else
-    {
-        stderr.writefln(fmt, args);
-    }
+    stderr.writefln(fmt, args);
+    stderr.flush();
+}
+
+auto fread(T)(ref File file, T[] buffer)
+{
+    return core.stdc.stdio.fread(buffer.ptr, T.sizeof, buffer.length, file.getFP);
 }
 
 enum ResponseState
@@ -42,11 +63,16 @@ void ensureResponseFinished()
     }
 }
 
+bool inHeaders()
+{
+    return responseState == ResponseState.headers;
+}
+
 void assertInHeaders(string functionName)
 {
     if(responseState != ResponseState.headers)
     {
-        log("Error: function \"%s\" was called after headers were finished", functionName);
+        logf("Error: function \"%s\" was called after headers were finished", functionName);
         assert(0, "function \"" ~ functionName ~ "\" was called after headers were finished");
     }
 }
@@ -58,7 +84,7 @@ void assertInContent(string functionName)
     }
     if(responseState != ResponseState.content)
     {
-        log("Error: function \"%s\" was called before headers were finished", functionName);
+        logf("Error: function \"%s\" was called before headers were finished", functionName);
         assert(0, "function \"" ~ functionName ~ "\" was called before headers were finished");
     }
 }
@@ -67,13 +93,13 @@ void assertInContent(string functionName)
 void addHeader(const(char)[] name, const(char)[] value)
 {
     assertInHeaders("addHeader");
-    stdout.writef("%s: %s\n", name, value);
+    stdout.writef("%s: %s\r\n", name, value);
 }
 void addSetCookieHeader(const(char)[] name, const(char)[] value, Duration expireTimeFromNow = Duration.zero)
 {
     assertInHeaders("addSetCookieHeader");
     if(expireTimeFromNow == Duration.zero) {
-        stdout.writef("Set-Cookie: %s=%s\n", name, value);
+        stdout.writef("Set-Cookie: %s=%s\r\n", name, value);
     } else {
         assert(0, "not implemented");
     }
@@ -81,12 +107,12 @@ void addSetCookieHeader(const(char)[] name, const(char)[] value, Duration expire
 void addUnsetCookieHeader(const(char)[] name)
 {
     assertInHeaders("addUnsetCookieHeader");
-    stdout.writef("Set-Cookie: %s=; expires=Thu, 01 Jan 1970 00:00:00 GMT\n", name);
+    stdout.writef("Set-Cookie: %s=; expires=Thu, 01 Jan 1970 00:00:00 GMT\r\n", name);
 }
 void finishHeaders()
 {
     assertInHeaders("finishHeaders");
-    stdout.write("\n");
+    stdout.write("\r\n");
     responseState = ResponseState.content;
 }
 
@@ -130,20 +156,22 @@ unittest
 
     // just instantiate the templates
     // all of the following should print "Hello, World!\n"
-    write("Hello");
-    write(", World!\n");
-    write("Hello%s", ", World!\n");
-    writeln("Hello, World!");
-    writeln("Hello%s", ", World!");
-    listWrite("Hello", ", Wo", "rld!\n");
-    listWriteln("Hel", "lo, Wo", "rld!");
+    if (false)
+    {
+        write("Hello");
+        write(", World!\n");
+        write("Hello%s", ", World!\n");
+        writeln("Hello, World!");
+        writeln("Hello%s", ", World!");
+        listWrite("Hello", ", Wo", "rld!\n");
+        listWriteln("Hel", "lo, Wo", "rld!");
+    }
 }
 
 void writeFile(const(char)[] filename)
 {
     assertInContent("writeFile");
     auto file = File(filename, "rb");
-    scope(exit) file.close();
 
     enum MAX_BUFFER_SIZE = 8192;
     auto fileSize = file.size();
@@ -153,11 +181,11 @@ void writeFile(const(char)[] filename)
     for(;fileLeft > 0;)
     {
         auto nextReadSize = (fileLeft > bufferSize) ? bufferSize : cast(size_t)fileLeft;
-        auto readSize = file.rawRead(buffer).length;
+        auto readSize = fread(file, buffer);
         if(readSize == 0)
         {
             auto message = format("only read %s bytes out of %s byte file \"%s\"", fileSize - fileLeft, fileSize, filename);
-            log("Error: %s", message);
+            logf("Error: %s", message);
             assert(0, message);
         }
         stdout.rawWrite(buffer[0..readSize]);
@@ -320,11 +348,11 @@ auto cookieRange(T)(T* cookieString)
         auto front() { return cookie; }
         void popFront()
         {
-            //log("cookieRange.popFront (\"%s\")", next[0..strlen(next)]);
+            //logf("cookieRange.popFront (\"%s\")", next[0..strlen(next)]);
             next = skipCharSet!" ;"(next);
             if(*next == '\0') {
                 cookie.name = null;
-                //log("cookieRange.popFront return null");
+                //logf("cookieRange.popFront return null");
                 return;
             }
 
@@ -341,7 +369,7 @@ auto cookieRange(T)(T* cookieString)
                 cookie.value = valuePtr[0..0];
                 next = valuePtr;
             }
-            //log("cookieRange.popFront name=\"%s\" value=\"%s\"", cookie.name, cookie.value);
+            //logf("cookieRange.popFront name=\"%s\" value=\"%s\"", cookie.name, cookie.value);
         }
     }
     return Range(cookieString);
@@ -384,7 +412,7 @@ auto queryVarsRange(T)(T* varZString)
                   var.value = valuePtr[0..0];
                   next = valuePtr;
                 }
-                //log("queryVarsRange name=\"%s\" value=\"%s\"", var.name, var.value);
+                //logf("queryVarsRange name=\"%s\" value=\"%s\"", var.name, var.value);
             }
         }
     }
@@ -400,8 +428,15 @@ bool isValidHtmlToken(char c)
       c == '_' ||
       c == '-';
 }
+
+/**
+Pulls the content-type "token/token" from the "Content-Type: header value.
+*/
 inout(char)[] pullContentTypeZString(inout(char)* contentType)
 {
+    if (contentType == null)
+        return null;
+
     auto start = contentType;
     char c;
     for(;; contentType++) {
@@ -421,6 +456,8 @@ inout(char)[] pullContentTypeZString(inout(char)* contentType)
     }
     return start[0 .. contentType - start];
 }
+
+enum HeaderContentType = "Content-Type: ";
 
 auto contentTypeArgRange(Char)(Char* contentTypeParams)
 {
@@ -469,18 +506,19 @@ auto httpHeaderArgRange(Char)(Char[] headerArgs)
     struct Range
     {
         Pair current;
+        Char* next;
         Char* limit;
         this(Char[] start)
         {
+            this.next = start.ptr;
             this.limit = start.ptr + start.length;
-            current.value = start.ptr[0..0];
             popFront();
         }
         bool empty() { return current.name is null; }
         auto front() { return current; }
         void popFront()
         {
-            auto next = (current.value.ptr + current.value.length).skipCharSet!" ;"(limit);
+            next = next.skipCharSet!" ;"(limit);
             if(next == limit) {
                 current.name = null;
             } else {
@@ -490,13 +528,22 @@ auto httpHeaderArgRange(Char)(Char[] headerArgs)
                     current.value = nameLimit[0..0];
                 } else {
                     auto valueStart = nameLimit + 1;
-                    auto valueEnd = valueStart.findCharPtr(limit, ';');
-                    current.value = trimRight2(valueStart[0..valueEnd - valueStart]);
+                    next = valueStart.findCharPtr(limit, ';');
+                    current.value = trimRight2(valueStart[0..next - valueStart]).escapeQuotesIfThere;
                 }
             }
         }
     }
     return Range(headerArgs);
+}
+
+inout(char)[] escapeQuotesIfThere(inout(char)[] str)
+{
+    if (str.length >= 2 && str[0] == '"' && str[$-1] == '"')
+    {
+        return str[1 ..($-1)]; // TODO: escape the quotes properly
+    }
+    return str;
 }
 
 inout(char)[] trimNewline(inout(char)[] str)
@@ -544,6 +591,8 @@ template strings(T...)
     alias strings = T;
 }
 
+__gshared string stdinReader = null;
+
 template HttpTemplate(Hooks)
 {
     static assert(Hooks.CookieVars.length == 0 || hasMember!(Env, "HTTP_COOKIE"),
@@ -561,7 +610,6 @@ template HttpTemplate(Hooks)
       UrlVars urlVars;
       FormVars formVars;
       UrlOrFormVars urlOrFormVars;
-      string stdinReadBy;
 
       void init()
       {
@@ -604,13 +652,13 @@ template HttpTemplate(Hooks)
             auto contentLength = env.CONTENT_LENGTH.to!size_t;
             auto buffer = new char[contentLength + 1];
             {
-              auto readLength = stdin.rawRead(buffer[0..contentLength]).length;
+              auto readLength = fread(stdin, buffer[0..contentLength]);
               if(readLength != contentLength) {
                 throw new Exception(format("based on CONTENT_LENGTH, expected %s bytes of data from stdin but only got %s",
                                           contentLength, readLength));
               }
             }
-            stdinReadBy = "the application/x-www-form-urlencoded parser";
+            stdinReader = "the application/x-www-form-urlencoded parser";
             buffer[contentLength] = '\0';
             size_t formVarsLeft = Hooks.FormVars.length;
             size_t urlOrFormVarsLeft = Hooks.UrlOrFormVars.length;
@@ -685,11 +733,11 @@ template HttpTemplate(Hooks)
       }
       private void parseCookies(const(char)[] cookieString)
       {
-        //log("parseCookies \"%s\"", cookieString);
+        //logf("parseCookies \"%s\"", cookieString);
         size_t varsLeft = Hooks.CookieVars.length;
       COOKIE_LOOP:
         foreach(cookie; cookieRange!(const(char))(cookieString.ptr)) {
-          //log("   \"%s\" = \"%s\"", cookie.name, cookie.value);
+          //logf("   \"%s\" = \"%s\"", cookie.name, cookie.value);
           foreach(varName; Hooks.CookieVars) {
             if(__traits(getMember, cookies, varName) is null && cookie.name == varName) {
               __traits(getMember, cookies, varName) = cookie.value;
@@ -703,39 +751,82 @@ template HttpTemplate(Hooks)
         }
       }
 
-      static if(!hasMember!(Env, "CONTENT_TYPE") || !hasMember!(Env, "CONTENT_LENGTH")) {
-        bool setupMultipartReader(T)(T* multipart)
+        static if(hasMember!(Env, "CONTENT_TYPE")/* && !hasMember!(Env, "CONTENT_LENGTH")*/)
         {
-          static assert(0, "cannot call setupMultipartReader unless you include CONTENT_TYPE and CONTENT_LENGTH in your EnvVars");
-        }
-      } else {
 
-        // TODO: checks that the content type is
-        bool setupMultipartReader(T)(T* multipart)
-        {
-          auto contentType = pullContentTypeZString(env.CONTENT_TYPE.ptr);
-          if(contentType == "multipart/form-data") {
-            if(stdinReadBy) {
-              throw new Exception(format("Cannot call setupMultipartReader because stdin was already read by %s", stdinReadBy));
-            }
-            const(char)[] boundary = null;
-            foreach(arg; contentTypeArgRange(env.CONTENT_TYPE.ptr + contentType.length)) {
-              if(arg.name == "boundary") {
-                boundary = arg.value;
-              } else {
-                assert(0, format("unknown Content-Type param \"%s\"=\"%s\"", arg.name, arg.value));
+            // returns: an error message on error
+            string getMultipartBoundary(const(char)[]* outBoundary)
+            {
+              auto contentType = pullContentTypeZString(env.CONTENT_TYPE.ptr);
+              if(contentType != "multipart/form-data")
+                return format("Content-Type is not 'multipart/form-data', it is '%s'", contentType);
+
+              foreach(arg; contentTypeArgRange(env.CONTENT_TYPE.ptr + contentType.length)) {
+                if(arg.name == "boundary") {
+                  *outBoundary = arg.value;
+                  return null; // no error
+                } else {
+                  // ignore
+                  //assert(0, format("unknown Content-Type param \"%s\"=\"%s\"", arg.name, arg.value));
+                }
               }
+              return format("Content-Type '%s' is missing the 'boundary' parameter", env.CONTENT_TYPE);
             }
-            if(boundary is null) {
-              assert(0, format("The Content-Type did not contain a boundary parameter \"%s\"", env.CONTENT_TYPE));
+
+            /**
+            Returns: null on success, error message on error
+            */
+            string uploadFile(const(char)[] fileFormName, char[] uploadBuffer,
+                string delegate(const(char)[] clientFilename, string* serverFilename) onFilename)
+            {
+                // TODO: might need to support variables as well
+                const(char)[] boundary;
+                {
+                    auto error = getMultipartBoundary(&boundary);
+                    if (error !is null)
+                        return error;
+                }
+                auto reader = StdinMultipartReader(uploadBuffer, boundary);
+
+                for (auto partResult = reader.start(); ;partResult = reader.readHeaders())
+                {
+                    if (partResult.isDone)
+                        return "missing file from post data";
+                    if (partResult.isError)
+                        return partResult.makeErrorMessage();
+
+                    if (partResult.formData.name != "file")
+                        return format("got unknown form variable '%s'", partResult.formData.name);
+
+                    if (partResult.formData.filename.canFind('/'))
+                        return format("filename '%s' contains slashes", partResult.formData.filename);
+
+                    string serverFilename = null;
+                    {
+                        auto error = onFilename(partResult.formData.filename, &serverFilename);
+                        if (error !is null)
+                            return error;
+                    }
+                    if (serverFilename is null)
+                        serverFilename = partResult.formData.filename;
+
+                    auto file = File(serverFilename, "wb");
+                    for (;;)
+                    {
+                        auto contentResult = reader.readContent();
+                        if (contentResult.isError)
+                            return contentResult.makeErrorMessage();
+
+                        //writeln("<pre>got %s bytes of content data</pre>", contentResult.content.length);
+                        file.rawWrite(contentResult.content);
+                        if (contentResult.gotBoundary)
+                            break;
+                    }
+                    return null; // success
+                }
             }
-            multipart.setBoundaryAndStartReading(boundary);
-            stdinReadBy = "multipartReader";
-            return true;
-          }
-          return false;
         }
-      }
+
     }
 
     struct Env
@@ -809,7 +900,7 @@ char[] tryRead(File file)
         assert(0, text(file.name, ": file is too large ", filesize, " > ", size_t.max));
     }
     auto contents = new char[cast(size_t)(filesize + 1)]; // add 1 for '\0'
-    auto readSize = file.rawRead(contents).length;
+    auto readSize = fread(file, contents);
     assert(filesize == readSize, text("rawRead only read ", readSize, " bytes of ", filesize, " byte file"));
     contents[cast(size_t)filesize] = '\0';
     return contents[0..$-1];
@@ -828,8 +919,8 @@ char[] tryReadFile(const(char)[] filename)
         assert(0, text(filename, ": file is too large ", filesize, " > ", size_t.max));
     }
     auto contents = new char[cast(size_t)(filesize + 1)]; // add 1 for '\0'
-    auto readSize = file.rawRead(contents).length;
-    assert(filesize == readSize, text("rawRead only read ", readSize, " bytes of ", filesize, " byte file"));
+    auto readSize = fread(file, contents);
+    assert(filesize == readSize, text("fread only read ", readSize, " bytes of ", filesize, " byte file"));
     contents[cast(size_t)filesize] = '\0';
     return contents[0..$-1];
 }
@@ -932,90 +1023,72 @@ size_t parseHex(const(char)[] hex, ubyte[] bin)
     return hexIndex;
 }
 
-bool endsWith(T,U)(T[] str, U[] check)
+/**
+Returns:`buffer.length` on success, negative on error, otherwise, the number of bytes read before EOF
+*/
+//
+auto readFull(Policy)(char[] buffer)
 {
-    return str.length >= check.length &&
-        str[$ - check.length..$] == check[];
-}
-
-struct DefaultStdinReader
-{
-    // buffer to read data into
-    private char[] buffer;
-    // length of data meant for the application
-    private size_t appDataLength;
-    // total length of data in the buffer that has been read
-    private size_t readDataLength;
-    //@property size_t dataLength() const { return dataLength; }
-    @property auto data() { return buffer[0..appDataLength]; }
-
-    void clearData()
+    size_t totalRead = 0;
+    for (;;)
     {
-        if(appDataLength)
+        if (totalRead == buffer.length)
+            return totalRead;
+        auto result = Policy.read(buffer[totalRead .. $]);
+        if (result <= 0)
         {
-            size_t saveLength = readDataLength - appDataLength;
-            if(saveLength)
-            {
-                /*
-                import std.stdio;
-                writefln("<pre style=\"color:blue\">shifting (ptr=%s, app=%s,read=%s) %s characters \"%s\"</pre>",
-                    cast(void*)&this, appDataLength, readDataLength, saveLength, buffer[appDataLength..readDataLength]);
-                    */
-                memmove(buffer.ptr, buffer.ptr + appDataLength, saveLength);
-            }
-            appDataLength = 0;
-            readDataLength = saveLength;
+            if (result == 0)
+                return totalRead;
+            return result;
         }
-    }
 
-    // Note: will only NOT read the given size if EOF is encountered
-    void tryRead(size_t size)
-        in { assert(size <= buffer.length); } body
-    {
-        //import std.stdio;
-        //writefln("<pre>tryRead(%s) app=%s, read=%s</pre>", size, appDataLength, readDataLength);
-        if(size <= readDataLength)
-        {
-            appDataLength += size;
-        }
-        else
-        {
-            auto sizeRead = stdin.rawRead(buffer[readDataLength..size]).length;
-            readDataLength += sizeRead;
-            appDataLength += sizeRead;
-        }
-        //writefln("<pre>tryRead returning \"%s\"</pre>", data);
-    }
-    void readln()
-    {
-        size_t checked = appDataLength;
-        for(;;)
-        {
-            auto newlineIndex = buffer[checked..readDataLength].indexOf('\n');
-            if(newlineIndex >= 0)
-            {
-                appDataLength = newlineIndex + 1;
-                //import std.stdio;
-                //writefln("<pre>readln (ptr=%s,app=%s,read=%s) returning \"%s\"</pre>", cast(void*)&this, appDataLength, readDataLength, data);
-                return;
-            }
-            auto bufferLeft = buffer.length - readDataLength;
-            if(bufferLeft == 0)
-            {
-                throw new Exception(format("buffer not large enough, not implemented (data=\"%s\")", asciiFormatEscaped(buffer)));
-            }
-            auto sizeRead = stdin.rawRead(buffer[readDataLength..$]).length;
-            if(sizeRead == 0)
-            {
-                appDataLength = readDataLength;
-                return; // got EOF
-            }
-            checked = readDataLength;
-            readDataLength += sizeRead;
-        }
+        totalRead += result;
     }
 }
 
+auto upTo(T)(T array, char toChar)
+{
+    auto charIndex = array.indexOf(toChar);
+    return (charIndex < 0) ? array : array[0 .. charIndex];
+}
+
+auto indexOfParts(U, T...)(U haystack, T parts)
+{
+    ptrdiff_t offset = 0;
+    for (;;)
+    {
+        auto next = haystack[offset .. $].indexOf(parts[0]);
+        if (next == -1)
+            return -1;
+        offset += next;
+        next = offset + parts[0].length;
+        bool mismatch = false;
+        foreach (part; parts[1 .. $])
+        {
+            if (!haystack[next .. $].startsWith(part))
+            {
+                mismatch = true;
+                break;
+            }
+            next += part.length;
+        }
+        if (!mismatch)
+            return offset;
+        offset++;
+    }
+}
+unittest
+{
+    assert("1234".indexOfParts("2") == 1);
+    assert("1234".indexOfParts("2", "3") == 1);
+    assert("1234".indexOfParts("23") == 1);
+    assert("1234".indexOfParts("23", "4") == 1);
+    assert("1234".indexOfParts("2", "34") == 1);
+    assert("123456789".indexOfParts("567", "8") == 4);
+    assert("123456789".indexOfParts("5", "678") == 4);
+    assert("123456789".indexOfParts("5", "67", "89") == 4);
+    assert("1231234123".indexOfParts("1", "2", "34") == 3);
+}
 
 struct MultipartFormData
 {
@@ -1029,131 +1102,638 @@ struct MultipartFormData
         this.contentType = null;
     }
 }
-auto multipartReader(T)(T reader)
+
+struct MultipartReaderTemplate(Policy)
 {
-    return MultipartReader!T(reader);
-}
-struct MultipartReader(StdinReader)
-{
-    StdinReader reader;
-    private const(char)[] boundary;
-    MultipartFormData current;
-
-    @disable this();
-    this(StdinReader reader)
+    // TODO: mabye create a mixin for this
+    static struct ReadHeadersResult
     {
-        this.reader = reader;
-    }
-    void setBoundaryAndStartReading(const(char)[] boundary)
-    {
-        this.boundary = boundary;
-        refPopFront();
-    }
-
-    auto readln()
-    {
-        reader.clearData();
-        reader.readln();
-        return reader.data;
-    }
-
-    bool refEmpty() { return current.name is null; }
-    MultipartFormData refFront()
-    {
-        return current;
-    }
-    void refPopFront()
-    {
-        //log("MultipartReader.popFront() enter");
-        //scope(exit) log("MultipartReader.popFront() exit");
-
-
-        // read the first 2 bytes
-        (&reader).clearData();
-        (&reader).tryRead(2);
-        if(reader.data != "--")
+        static ReadHeadersResult atContent(MultipartFormData formData) { return ReadHeadersResult(formData); }
+        static ReadHeadersResult done() { return ReadHeadersResult(State.done); }
+        static ReadHeadersResult policyError(string errorMsg)
         {
-            throw new Exception(format("Error: expected \"--\" but got \"%s\"", reader.data.asciiFormatEscaped()));
+            auto r = ReadHeadersResult(State.policyError);
+            r.str = errorMsg;
+            return r;
         }
-        // todo: handle large boundaries that cannot be read into 1 buffer
-        (&reader).clearData();
-        (&reader).tryRead(boundary.length);
-        // todo: handle EOF here
-        if(reader.data != boundary)
+        static ReadHeadersResult bufferTooSmallForBoundary() { return ReadHeadersResult(State.bufferTooSmallForBoundary); }
+        static ReadHeadersResult bufferTooSmallForHeaders() { return ReadHeadersResult(State.bufferTooSmallForHeaders); }
+        static ReadHeadersResult readError(int errorNumber)
         {
-            throw new Exception(format("Error: expected boundary \"%s\" but got \"%s\"", boundary, reader.data.asciiFormatEscaped()));
+            auto r = ReadHeadersResult(State.readError);
+            r.int_ = errorNumber;
+            return r;
+        }
+        static ReadHeadersResult invalidFirstBoundary() { return ReadHeadersResult(State.invalidFirstBoundary); }
+        static ReadHeadersResult invalidBoundaryPostfix() { return ReadHeadersResult(State.invalidBoundaryPostfix); }
+        static ReadHeadersResult headerTooBig() { return ReadHeadersResult(State.headerTooBig); }
+        static ReadHeadersResult eofInsideHeaders() { return ReadHeadersResult(State.eofInsideHeaders); }
+        static ReadHeadersResult unknownHeader(char[] s)
+        {
+            auto r = ReadHeadersResult(State.unknownHeader);
+            r.charArray = s;
+            return r;
+        }
+        static ReadHeadersResult missingContentDisposition() { return ReadHeadersResult(State.missingContentDisposition); }
+        static ReadHeadersResult unknownContentDispositionArg(char[] s)
+        {
+            auto r = ReadHeadersResult(State.unknownContentDispositionArg);
+            r.charArray = s;
+            return r;
+        }
+        static ReadHeadersResult contentDispositionMissingFormData() { return ReadHeadersResult(State.contentDispositionMissingFormData); }
+        static ReadHeadersResult contentDispositionMissingName() { return ReadHeadersResult(State.contentDispositionMissingName); }
+
+        private enum State : ubyte
+        {
+            atContent,
+            done,
+            // error states
+            errorStates,
+            policyError = errorStates,
+            bufferTooSmallForBoundary,
+            bufferTooSmallForHeaders,
+            readError,
+            invalidFirstBoundary,
+            invalidBoundaryPostfix,
+            headerTooBig,
+            eofInsideHeaders,
+            unknownHeader,
+            missingContentDisposition,
+            unknownContentDispositionArg,
+            contentDispositionMissingFormData,
+            contentDispositionMissingName,
+        }
+        State state;
+        union
+        {
+            MultipartFormData formData;
+            char[] charArray;
+            string str;
+            int int_;
+        }
+        private this(State state)
+        {
+            this.state = state;
+        }
+        private this(MultipartFormData formData)
+        {
+            this.state = State.atContent;
+            this.formData = formData;
         }
 
-        log("Reading boundary newline...");
-        (&reader).clearData();
-        (&reader).readln();
+        bool isError() const { return state >= State.errorStates; }
+        bool isDone() const { return state == State.done; }
+
+        string makeErrorMessage() const
         {
-            auto rest = reader.data.trimNewline();
-            if(rest.length > 0)
+            final switch(state)
             {
-                throw new Exception(format("Error: boundary line had %s extra characters \"%s\"", rest.length, rest));
+                case State.atContent: return "no error";
+                case State.done: return "no error";
+                case State.policyError: return str;
+                case State.bufferTooSmallForBoundary:
+                    return "upload buffer too small (cannot hold boundary)";
+                case State.bufferTooSmallForHeaders:
+                    return "upload buffer too small (cannot hold headers)";
+                case State.readError:
+                    return format("read failed (e=%d)", int_);
+                case State.invalidFirstBoundary:
+                    return "invalid upload data (initial boundary is not right)";
+                case State.invalidBoundaryPostfix:
+                    return "invalid upload data (invalid boundary postfix)";
+                case State.headerTooBig:
+                    return format("invalid upload data (header exceeded max size of %s)", Policy.MaxHeader);
+                case State.eofInsideHeaders:
+                    return "invalid upload data (input ended inside headers)";
+                case State.unknownHeader:
+                    return format("invalid upload data (unrecognized header '%s')", charArray);
+                case State.missingContentDisposition:
+                    return "invalid upload data (missing Content-Disposition)";
+                case State.unknownContentDispositionArg:
+                    return format("invalid upload data (unknown Content-Disposition arg '%s')", charArray);
+                case State.contentDispositionMissingFormData:
+                    return "invalid upload data (Content-Disposition is missing form-data argument)";
+                case State.contentDispositionMissingName:
+                    return "invalid upload data (Content-Disposition is missing name argument)";
             }
         }
+    }
 
-        current.reset();
-        bool foundContentDisposition = false;
-        for(;;)
+    char[] buffer;
+    const(char)[] boundary;
+    size_t dataOffset;
+    size_t dataLimit;
+
+    pragma(inline) auto encapsulateBoundaryLength() const
+    {
+        return 4 +                // "\r\n--"
+               boundary.length ;  // Content-Type boundary string
+    }
+    ReadHeadersResult start()
+    {
         {
-            log("Reading line...");
-            (&reader).clearData();
-            (&reader).readln();
-            auto line = reader.data.trimNewline();
-            if(line.length == 0)
+            auto error = Policy.checkForErrorBeforeStart();
+            if (error !is null)
+                return ReadHeadersResult.policyError(error);
+        }
+        // TODO: the multipart content could start with a prologue instead
+        //       of starting with the boundary right away
+        auto firstBoundaryLength = 2 + boundary.length; // "--" ~ boundary
+        if (buffer.length < firstBoundaryLength)
+            return ReadHeadersResult.bufferTooSmallForBoundary;
+
+        auto result = readFull!Policy(buffer[0 .. firstBoundaryLength]);
+        if (result != firstBoundaryLength)
+        {
+            if (result == 0)
+                return ReadHeadersResult.done;
+            return ReadHeadersResult.readError(Policy.getError(result));
+        }
+        if (buffer[0 .. 2] != "--" ||
+            buffer[2 .. 2 + boundary.length] != boundary)
+            return ReadHeadersResult.invalidFirstBoundary;
+        dataOffset = 0;
+        dataLimit = 0;
+        return readHeaders();
+    }
+
+    /** shift current data to the beginning of the buffer */
+    private void shiftData()
+    {
+        auto saveLength = dataLimit - dataOffset;
+        if (saveLength > 0)
+        {
+            memmove(buffer.ptr, buffer.ptr + dataOffset, saveLength);
+        }
+        dataOffset = 0;
+        dataLimit = saveLength;
+    }
+
+    // returns: positive on success, 0 on EOF, negative on error
+    private auto ensureSmallDataSizeAvailable(uint size)
+    in { /*assert(size <= buffer.length);*/ } do
+    {
+        auto dataSize = dataLimit - dataOffset;
+        if (size > dataSize)
+        {
+            shiftData();
+            auto bufferAvailable = buffer.length - dataLimit;
+            auto sizeToRead = size - dataSize;
+            // NOTE: sizeToRead must be <= (buffer.length - dataLimit)
+            //       because size <= buffer.length
+            auto result = Policy.read(buffer[dataLimit .. dataLimit + sizeToRead]);
+            if (result <= 0)
+                return result;
+            dataLimit += result;
+            if (result != sizeToRead)
+                return -1;
+            return result;
+        }
+        return 1; // success
+    }
+
+    ReadHeadersResult readHeaders()
+    {
+        // check whether we start with a "\r\n" or "--"
+        {
+            auto result = ensureSmallDataSizeAvailable(2);
+            if (result <= 0)
             {
-                log("MultiPartReader.popFront() BLANK", line);
-                break;
+                if (result == 0)
+                    return ReadHeadersResult.eofInsideHeaders;
+                return ReadHeadersResult.readError(Policy.getError(result));
             }
-            log("MultiPartReader.popFront() line \"%s\"", line);
-            enum FormDataLinePrefix = "Content-Disposition: form-data";
-            if(line.startsWith(FormDataLinePrefix))
+        }
+        auto boundaryPostfix = buffer[dataOffset .. dataOffset + 2];
+        if (boundaryPostfix == "\r\n")
+            dataOffset += 2;
+        else if (boundaryPostfix == "--")
+            return ReadHeadersResult.done;
+        else
+            return ReadHeadersResult.invalidBoundaryPostfix;
+
+        MultipartFormData formData;
+        auto checkIndex = dataOffset;
+        //import std.stdio; writefln("+ readHeaders (checkIndex=%s, dataSize=%s)", checkIndex, dataLimit - dataOffset);
+        for (;;)
+        {
+            // find the end of the next header
+            auto newlinePos = buffer[checkIndex .. dataLimit].indexOf("\n");
+            //import std.stdio; writefln("newlinePos=%s, (checkIndex=%s)", newlinePos, checkIndex);
+            if (newlinePos == -1)
             {
-                if(foundContentDisposition)
+                shiftData();
+                if (dataLimit > Policy.MaxHeader)
+                    return ReadHeadersResult.headerTooBig();
+                auto bufferAvailable = buffer.length - dataLimit;
+                if (bufferAvailable == 0)
+                    return ReadHeadersResult.bufferTooSmallForHeaders;
+                // TODO: don't read TOO much, we don't want to
+                //       end up "shifting" too much data
+                auto result = Policy.read(buffer[dataLimit .. $]);
+                //import std.stdio; writefln("read %s bytes", result);
+                if (result <= 0)
                 {
-                    throw new Exception("found multiple lines starting with \"%s\"", FormDataLinePrefix);
-                }
-                foundContentDisposition = true;
-                foreach(arg; httpHeaderArgRange(line[FormDataLinePrefix.length..$]))
-                {
-                    if(arg.name == "name")
+                    if (result == 0)
                     {
-                        if(current.name)
-                        {
-                            throw new Exception("Content-Disposition 'name' found more than once");
+                        if (dataOffset == dataLimit) {
+                            return ReadHeadersResult.done;
                         }
-                        current.name = arg.value.dup;
+                        return ReadHeadersResult.eofInsideHeaders;
                     }
-                    else if(arg.name == "filename")
-                    {
-                        if(current.filename)
-                        {
-                            throw new Exception("Content-Disposition 'filename' found more than once");
-                        }
-                        current.filename = arg.value.dup;
-                    }
-                    else
-                    {
-                        throw new Exception(format("Content-Disposition not implemented, name=\"%s\"", arg.name, arg.value));
-                    }
+                    return ReadHeadersResult.readError(Policy.getError(result));
                 }
+                checkIndex = dataLimit;
+                dataLimit += result;
             }
             else
             {
-                throw new Exception(format("not implemented, line = \"%s\"", line));
+                auto newlineOffset = checkIndex + newlinePos;
+                auto header = buffer[dataOffset .. newlineOffset - 1];
+                dataOffset = newlineOffset + 1;
+                //import std.stdio; writefln("header = '%s'", header.asciiFormatEscaped);
+
+                if (header.length == 0)
+                {
+                    if (formData.name is null)
+                        return ReadHeadersResult.missingContentDisposition;
+                    return ReadHeadersResult.atContent(formData);
+                }
+                import std.algorithm : skipOver;
+                if (header.skipOver("Content-Disposition: "))
+                {
+                    if (!header.skipOver("form-data"))
+                        return ReadHeadersResult.contentDispositionMissingFormData;
+                    foreach(arg; httpHeaderArgRange(header))
+                    {
+                        if(arg.name == "name")
+                            formData.name = Policy.allocName(arg.value);
+                        else if(arg.name == "filename")
+                            formData.filename = Policy.allocName(arg.value);
+                        else
+                            return ReadHeadersResult.unknownContentDispositionArg(arg.name);
+                    }
+                    if (formData.name is null)
+                        return ReadHeadersResult.contentDispositionMissingName;
+                    //import std.stdio; writefln("formData.name = '%s'", formData.name);
+                }
+                else if (header.skipOver("Content-Type: "))
+                {
+                    formData.contentType = Policy.allocName(header);
+                }
+                else
+                {
+                    return ReadHeadersResult.unknownHeader(header.upTo(':'));
+                }
+                checkIndex = dataOffset;
             }
         }
-        if(current.name is null)
+    }
+
+    static struct ReadContentResult
+    {
+        static ReadContentResult contentButNoBoundaryYet(char[] content)
         {
-            throw new Exception("name was not set!");
+            ReadContentResult result = void;
+            result.state = State.contentButNoBoundaryYet;
+            result._content = content;
+            return result;
+        }
+        static ReadContentResult contentWithBoundary(char[] content)
+        {
+            ReadContentResult result = void;
+            result.state = State.contentWithBoundary;
+            result._content = content;
+            return result;
+        }
+        static ReadContentResult bufferTooSmallForBoundary()
+        { return ReadContentResult(State.bufferTooSmallForBoundary); }
+        static ReadContentResult noEndingBoundary()
+        { return ReadContentResult(State.noEndingBoundary); }
+        static ReadContentResult readError(int errorNumber)
+        {
+            auto r = ReadContentResult(State.readError);
+            r.int_ = errorNumber;
+            return r;
+        }
+
+        private enum State : ubyte
+        {
+            // gotContent states
+            contentButNoBoundaryYet,
+            contentWithBoundary,
+            // error states
+            errorStates,
+            bufferTooSmallForBoundary = errorStates,
+            noEndingBoundary,
+            readError,
+        }
+        State state;
+        union
+        {
+            private char[] _content;
+            private int int_;
+        }
+        bool isError() const { return state >= State.errorStates; }
+        char[] content() const { return cast(char[])_content; }
+        bool gotBoundary() const { return state == State.contentWithBoundary; }
+
+        string makeErrorMessage() const
+        {
+            final switch(state)
+            {
+                case State.contentButNoBoundaryYet: return "no error";
+                case State.contentWithBoundary: return "no error";
+                case State.bufferTooSmallForBoundary:
+                    return "upload buffer too small (cannot hold boundary)";
+                case State.noEndingBoundary:
+                    return "invalid upload data (missing terminating boundary)";
+                case State.readError:
+                    return format("read failed (e=%d)", int_);
+            }
+        }
+    }
+    ReadContentResult readContent()
+    {
+        auto checkIndex = dataOffset;
+        //import std.stdio; writefln("+ readContent (checkIndex=%s, dataSize=%s)", checkIndex, dataLimit - dataOffset);
+        for (;;)
+        {
+            //import std.stdio; writefln("readContent Loop");
+            auto nextBoundaryPos = buffer[checkIndex .. dataLimit].indexOfParts("\r\n--", boundary);
+            if (nextBoundaryPos == -1)
+            {
+                //import std.stdio; writefln("boundary not found!");
+                auto dataLength = dataLimit - dataOffset;
+                if (dataLength >= encapsulateBoundaryLength) {
+                    auto returnLimit = dataLimit - (encapsulateBoundaryLength - 1);
+                    auto content = buffer[dataOffset .. returnLimit];
+                    //import std.stdio; writefln("returning data %s to %s", dataOffset, returnLimit);
+                    dataOffset = returnLimit;
+                    return ReadContentResult.contentButNoBoundaryYet(content);
+                }
+                // we need to read more data
+                shiftData();
+                auto bufferAvailable = buffer.length - dataLimit;
+                //import std.stdio; writefln("readContent shift (data=%s, available=%s)", dataLimit, bufferAvailable);
+                if (bufferAvailable == 0)
+                    return ReadContentResult.bufferTooSmallForBoundary;
+                // TODO: don't read TOO much, we don't want to
+                //       end up "shifting" too much data
+                auto result = Policy.read(buffer[dataLimit .. $]);
+                //import std.stdio; writefln("read %s bytes (in readContent)", result);
+                if (result <= 0)
+                {
+                    if (result == 0)
+                        return ReadContentResult.noEndingBoundary;
+                    return ReadContentResult.readError(Policy.getError(result));
+                }
+                if (dataLimit > (encapsulateBoundaryLength - 1))
+                    checkIndex = dataLimit - (encapsulateBoundaryLength - 1);
+                else
+                    checkIndex = 0;
+                dataLimit += result;
+//                import std.stdio; writefln("checkIndex = %s, dataLimit=%s, encapsulateBoundaryLength=%s check='%s'",
+//                    checkIndex, dataLimit, encapsulateBoundaryLength, buffer[checkIndex .. dataLimit]);
+//                import std.stdio; writefln("checkIndex = %s, dataLimit=%s, encapsulateBoundaryLength=%s",
+//                    checkIndex, dataLimit, encapsulateBoundaryLength);
+            }
+            else
+            {
+                //import std.stdio; writefln("foundBoundary!");
+                auto nextBoundaryIndex = checkIndex + nextBoundaryPos;
+                auto contentStart = dataOffset;
+                dataOffset = nextBoundaryIndex + encapsulateBoundaryLength;
+                return ReadContentResult.contentWithBoundary(buffer[contentStart .. nextBoundaryIndex]);
+            }
         }
     }
 }
 
-// assumption: str is null terminated
+version (linux)
+{
+    extern(C) ptrdiff_t read(int fd, void* ptr, size_t len);
+}
+else static assert(0, "read function not implemented on this platform");
+
+private struct StdinMultipartReaderPolicy
+{
+    enum MaxHeader = 200;
+    // returns error message if we cannot start reading
+    static string checkForErrorBeforeStart()
+    {
+        if (stdinReader)
+            return format("CodeBug: cannot use StdinMultipartReader because stdin was already read by '%s'", stdinReader);
+        stdinReader = "multipartReader";
+        return null; // no errors
+    }
+    static auto read(char[] buffer)
+    {
+        return .read(0, buffer.ptr, buffer.length);
+    }
+    static auto getError(ptrdiff_t result)
+    {
+        static import core.stdc.errno;
+        return core.stdc.errno.errno;
+    }
+    static auto allocName(const(char)[] name)
+    {
+        return name.idup;
+    }
+}
+alias StdinMultipartReader = MultipartReaderTemplate!StdinMultipartReaderPolicy;
+
+unittest
+{
+    static char[] inBuffer;
+    static size_t inOffset;
+    static size_t inLimit;
+    inBuffer = new char[3000];
+    static void setInData(string s)
+    {
+        //import std.stdio; writefln("inData '%s'", s);
+        inBuffer[0 .. s.length] = s;
+        inOffset = 0;
+        inLimit = s.length;
+    }
+    static string generateTestContent(size_t size)
+    {
+        static hexmap = "0123456789abcdef";
+        auto content = new char[size];
+        foreach (i; 0 .. size) {
+            content[i] = hexmap[i & 0b1111];
+        }
+        return cast(string)content;
+    }
+    static struct TestMultipartReaderPolicy
+    {
+        enum MaxHeader = 200;
+        pragma(inline)
+        static string checkForErrorBeforeStart()
+        {
+            return null; // no error
+        }
+        pragma(inline)
+        static auto read(char[] buffer)
+        {
+            //import std.stdio; writefln("ReadCall (in %s-%s) (size=%s)", inOffset, inLimit, buffer.length);
+            auto readSize = inLimit - inOffset;
+            if (buffer.length < readSize)
+                readSize = buffer.length;
+            buffer[0 .. readSize] = inBuffer[inOffset .. inOffset + readSize];
+            inOffset += readSize;
+            return readSize;
+        }
+        static auto getError(ptrdiff_t result)
+        {
+            assert(0, "not implemented");
+            return result;
+        }
+        static auto allocName(const(char)[] name)
+        {
+            return name.idup;
+        }
+    }
+    alias TestMultipartReader = MultipartReaderTemplate!TestMultipartReaderPolicy;
+    char[  1]   buffer1;
+    char[  4]   buffer4;
+    char[100] buffer100;
+    {
+        setInData("");
+        auto reader = TestMultipartReader(buffer100, "MYBOUNDARY");
+        assert(reader.start().isDone);
+    }
+    {
+        setInData("--MYBOUNDARY\r\n\r\n");
+        auto reader = TestMultipartReader(buffer100, "MYBOUNDARY");
+        assert(reader.start().state == TestMultipartReader.ReadHeadersResult.State.missingContentDisposition);
+    }
+    {
+        setInData("--MYBOUNDARY\r\n"
+            ~ "Content-Disposition: form-data; name=\"TestVariable\"\r\n\r\n");
+        auto reader = TestMultipartReader(buffer100, "MYBOUNDARY");
+        auto result = reader.start();
+        assert(!result.isError);
+    }
+    {
+        setInData("--MYBOUNDARY\r\n"
+            ~ "Content-Disposition: form-data; name=\"TestVar\"\r\n"
+            ~ "Content-Type: plain/text\r\n\r\n");
+        auto reader = TestMultipartReader(buffer100, "MYBOUNDARY");
+        auto result = reader.start();
+        assert(!result.isError);
+
+    }
+    {
+        setInData("--MYBOUNDARY\r\n"
+            ~ "Content-Disposition: form-data; name=\"TestVar\"\r\n"
+            ~ "Content-Type: plain/text\r\n\r\n"
+            ~ "\r\n--MYBOUNDARY\r\n");
+        auto reader = TestMultipartReader(buffer100, "MYBOUNDARY");
+        {
+            auto result = reader.start();
+            assert(!result.isError);
+        }
+        {
+            auto result = reader.readContent();
+            assert(result.gotBoundary);
+            assert(result.content.length == 0);
+        }
+        {
+            auto result = reader.readHeaders();
+            assert(result.isDone);
+        }
+    }
+
+    static void readAndDropContent(TestMultipartReader* reader)
+    {
+        for (;;)
+        {
+            auto result = reader.readContent();
+            assert(!result.isError);
+            if (result.gotBoundary)
+                return;
+        }
+    }
+    static void readAndDropContentSize(TestMultipartReader* reader, size_t contentLeft)
+    {
+        for (;;)
+        {
+            auto result = reader.readContent();
+            assert(!result.isError);
+            if (result.content.length > contentLeft)
+            {
+                import std.stdio;
+                writefln("result.content.length %s contentLeft %s", result.content.length, contentLeft);
+            }
+            assert(result.content.length <= contentLeft);
+            contentLeft -= result.content.length;
+            if (contentLeft == 0)
+            {
+                if (result.gotBoundary)
+                    return;
+            }
+            assert(!result.gotBoundary);
+        }
+    }
+
+    foreach (bufferSize; 50 .. 101)
+    {
+        foreach (contentSize; 0 .. 301)
+        {
+            setInData("--MYBOUNDARY\r\n"
+                ~ "Content-Disposition: form-data; name=\"TestVar\"\r\n"
+                ~ "Content-Type: plain/text\r\n\r\n"
+                ~ generateTestContent(contentSize)
+                ~ "\r\n--MYBOUNDARY\r\n");
+            auto reader = TestMultipartReader(buffer100[0 .. bufferSize], "MYBOUNDARY");
+            {
+                auto result = reader.start();
+                assert(!result.isError);
+            }
+            readAndDropContentSize(&reader, contentSize);
+            {
+                auto result = reader.readHeaders();
+                //import std.stdio; writefln("state = %s", result.state);
+                assert(result.isDone);
+            }
+        }
+    }
+
+    foreach (bufferSize; 60 .. 101)
+    {
+        setInData(  "------WebKitFormBoundaryDL9nQxvP3BPx3UvL\r\n"
+                  ~ "Content-Disposition: form-data; name=\"TestVariable1\"\r\n"
+                  ~ "\r\n"
+                  ~ "TestValue1\r\n"
+                  ~ "------WebKitFormBoundaryDL9nQxvP3BPx3UvL\r\n"
+                  ~ "Content-Disposition: form-data; name=\"TestVariable2\"\r\n"
+                  ~ "\r\n"
+                  ~ "TestValue2\r\n"
+                  ~ "------WebKitFormBoundaryDL9nQxvP3BPx3UvL\r\n"
+                  ~ "Content-Disposition: form-data; name=\"TestVariable3\"\r\n"
+                  ~ "\r\n"
+                  ~ "TestValue3\r\n"
+                  ~ "------WebKitFormBoundaryDL9nQxvP3BPx3UvL\r\n"
+                  ~ "Content-Disposition: form-data; name=\"file\"; filename=\"10bytesandnewline.txt\"\r\n"
+                  ~ "Content-Type: text/plain\r\n"
+                  ~ "\r\n"
+                  ~ "0123456789\r\n"
+                  ~ "\r\n"
+                  ~ "------WebKitFormBoundaryDL9nQxvP3BPx3UvL--\r\n");
+        auto reader = TestMultipartReader(buffer100[0 .. bufferSize], "----WebKitFormBoundaryDL9nQxvP3BPx3UvL");
+        {
+            auto result = reader.start();
+            assert(!result.isError);
+        }
+        readAndDropContentSize(&reader, 10);
+    }
+
+}
+
+
+// Assumption: str is null terminated
 alias zStringByLine = delimited!'\n'.sentinalRange!('\0', const(char));
 alias stringByLine = delimited!'\n'.range;
 unittest
@@ -1264,6 +1844,8 @@ template delimited(char delimiter)
 
     enum findFormatCode = q{
     {
+        if (haystack == null)
+            return null;
         for(;;) {
             auto nextLimit = %s;
             auto value = haystack[0..nextLimit - haystack];
@@ -1338,6 +1920,7 @@ unittest
     import more.test;
     mixin(scopedTest!"cgi - delimited 1");
 
+    assert("" == delimited!':'.find(cast(char*)null, ""));
     assert("" == delimited!':'.find("\0".ptr, ""));
 
     assert(null == delimited!':'.find("\0".ptr, "a"));

@@ -10,23 +10,32 @@ enum outerBar = "=========================================";
 enum innerBar = "-----------------------------------------";
 void startTest(string name)
 {
-    writeln(outerBar);
-    writeln(name, ": Start");
-    writeln(innerBar);
+    version (PrintTestBoundaries)
+    {
+        writeln(outerBar);
+        writeln(name, ": Start");
+        writeln(innerBar);
+    }
 }
 void endFailedTest(string name)
 {
     failTestCount++;
-    writeln(innerBar);
-    writeln(name, ": Failed");
-    writeln(outerBar);
+    version (PrintTestBoundaries)
+    {
+        writeln(innerBar);
+        writeln(name, ": Failed");
+        writeln(outerBar);
+    }
 }
 void endPassedTest(string name)
 {
     passTestCount++;
-    writeln(innerBar);
-    writeln(name, ": Passed");
-    writeln(outerBar);
+    version (PrintTestBoundaries)
+    {
+        writeln(innerBar);
+        writeln(name, ": Passed");
+        writeln(outerBar);
+    }
 }
 template scopedTest(string name) {
     enum scopedTest =
