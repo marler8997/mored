@@ -15,7 +15,8 @@ version(Windows)
 }
 else version(Posix)
 {
-    // TODO: fill this in
+    import more.os.posix.sock :
+        addrinfo, getaddrinfo;
 }
 else
 {

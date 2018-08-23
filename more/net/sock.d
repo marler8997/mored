@@ -22,47 +22,46 @@ import more.c : cint, cuint;
 import more.format : StringSink;
 version(Windows)
 {
-    import more.os.windows.sock;
-    alias platform_sock = more.os.windows.sock;
+    import platform_sock = more.os.windows.sock;
     public import more.os.windows.core : lastError;
 }
 else version(Posix)
 {
-    import more.os.posix.sock;
-    alias platform_sock = more.os.windows.sock;
-    public import more.os.windows.core : lastError;
+    import platform_sock = more.os.posix.sock;
+    import platform_core = more.os.posix.core;
+    public import more.os.posix.core : lastError;
 }
 else static assert(0);
 
 enum AddressFamily : ushort
 {
-    unspec    = AF_UNSPEC,
-    unix      = AF_UNIX,
-    inet      = AF_INET,
-    inet6     = AF_INET6,
-    ipx       = AF_IPX,
-    appleTalk = AF_APPLETALK,
+    unspec    = platform_sock.AF_UNSPEC,
+    unix      = platform_sock.AF_UNIX,
+    inet      = platform_sock.AF_INET,
+    inet6     = platform_sock.AF_INET6,
+    ipx       = platform_sock.AF_IPX,
+    appleTalk = platform_sock.AF_APPLETALK,
 }
 enum SocketType : int
 {
-    stream    = SOCK_STREAM,
-    dgram     = SOCK_DGRAM,
-    raw       = SOCK_RAW,
-    rdm       = SOCK_RDM,
-    seqPacket = SOCK_SEQPACKET,
+    stream    = platform_sock.SOCK_STREAM,
+    dgram     = platform_sock.SOCK_DGRAM,
+    raw       = platform_sock.SOCK_RAW,
+    rdm       = platform_sock.SOCK_RDM,
+    seqPacket = platform_sock.SOCK_SEQPACKET,
 }
 enum Protocol : int
 {
-    raw  = IPPROTO_RAW,
-    udp  = IPPROTO_UDP,
-    tcp  = IPPROTO_TCP,
-    ip   = IPPROTO_IP,
-    ipv6 = IPPROTO_IPV6,
-    icmp = IPPROTO_ICMP,
-    igmp = IPPROTO_IGMP,
-    ggp  = IPPROTO_GGP,
-    pup  = IPPROTO_PUP,
-    idp  = IPPROTO_IDP,
+    raw  = platform_sock.IPPROTO_RAW,
+    udp  = platform_sock.IPPROTO_UDP,
+    tcp  = platform_sock.IPPROTO_TCP,
+    ip   = platform_sock.IPPROTO_IP,
+    ipv6 = platform_sock.IPPROTO_IPV6,
+    icmp = platform_sock.IPPROTO_ICMP,
+    igmp = platform_sock.IPPROTO_IGMP,
+    ggp  = platform_sock.IPPROTO_GGP,
+    pup  = platform_sock.IPPROTO_PUP,
+    idp  = platform_sock.IPPROTO_IDP,
 }
 
 T ntohs(T)(T value) if(T.sizeof == 2)
@@ -209,7 +208,7 @@ union inet_sockaddr
             }
             else
             {
-                assert(inet_ntop(AddressFamily.inet6, &ipv6.sin6_addr, str.ptr, str.length),
+                assert(platform_sock.inet_ntop(AddressFamily.inet6, &ipv6.sin6_addr, str.ptr, str.length),
                     format("inet_ntop failed (e=%s)", lastError()));
             }
             formattedWrite(sink, "[%s]:%s", str.ptr[0..core.stdc.string.strlen(str.ptr)], ntohs(in_port));
@@ -247,9 +246,9 @@ version (Windows)
         }
     }
 }
-else
+else version(Posix)
 {
-    alias SocketHandle = FileHandle;
+    alias SocketHandle = platform_core.FileHandle;
 }
 
 struct SockResult
@@ -289,7 +288,7 @@ struct SendResult
 
 SocketHandle createsocket(AddressFamily family, SocketType type, Protocol protocol)
 {
-    return socket(family, type, protocol);
+    return platform_sock.socket(family, type, protocol);
 }
 
 version (Windows)
@@ -297,6 +296,13 @@ version (Windows)
     extern(Windows) nothrow @nogc
     {
         SockResult closesocket(SocketHandle);
+    }
+}
+else version (Posix)
+{
+    pragma(inline) int closesocket(SocketHandle handle) nothrow @nogc
+    {
+        return platform_core.close(handle);
     }
 }
 else
@@ -393,7 +399,7 @@ version (Windows)
     extern(Windows) nothrow @nogc
     {
         // TODO: return value should by typed
-        int select(int ignore, fd_set* readfds, fd_set* writefds, fd_set* exceptfds, timeval* timeout);
+        int select(int ignore, fd_set* readfds, fd_set* writefds, fd_set* exceptfds, platform_sock.timeval* timeout);
     }
 }
 
@@ -406,13 +412,13 @@ passfail setMode(SocketHandle sock, Blocking blocking)
     version (Windows)
     {
         uint ioctlArg = blocking ? 0 : 0xFFFFFFFF;
-        return ioctlsocket(sock, FIONBIO, &ioctlArg).passed ? passfail.pass : passfail.fail;
+        return platform_sock.ioctlsocket(sock, platform_sock.FIONBIO, &ioctlArg).passed ? passfail.pass : passfail.fail;
     }
     else
     {
-        auto flags = fcntlGetFlags(sock);
+        auto flags = platform_core.fcntlGetFlags(sock);
         if (flags.isInvalid)
             return passfail.fail;
-        return fcntlSetFlags(sock, flags | O_NONBLOCK);
+        return platform_core.fcntlSetFlags(sock, flags | platform_core.O_NONBLOCK);
     }
 }
