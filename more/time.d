@@ -23,6 +23,16 @@ version(Windows)
     }
 }
 
+version (Windows)
+{
+    pragma(inline) auto ticksPerSecond() { return performanceFrequency; }
+}
+else version (Posix)
+{
+    // FOR NOW: we are just going to represent posix ticks as microseconds
+    enum ticksPerSecond = 1000000; // assume nanosecond for now
+}
+
 enum TimeUnit : byte
 {
     seconds      =   0, // 10 ^ 0
@@ -129,7 +139,7 @@ struct Duration(TimeUnit timeUnit, T)
     auto to(TimeUnit unit)() const
     {
         assert(0, "not implemented");
-        //return value * mixin(unit.inverseMultiplierMixin) / performanceFrequency;
+        //return value * mixin(unit.inverseMultiplierMixin) / ticksPerSecond;
     }
     T to(TimeUnit unit, T)() const
     {
@@ -164,22 +174,14 @@ template TimeTemplate(Policy)
         */
         static DurationTicks unitsPerTick(TimeUnit unit)() pure
         {
-            version(Windows)
-            {
-                return DurationTicks(performanceFrequency * mixin(unit.inverseMultiplierMixin));
-            }
-            else static assert(0, "Timer not supported on this platform");
+            return DurationTicks(ticksPerSecond * mixin(unit.inverseMultiplierMixin));
         }
         /**
         Return the number ticks for 1 unit.
         */
         static DurationTicks per(TimeUnit unit)() pure
         {
-            version(Windows)
-            {
-                return DurationTicks(performanceFrequency / mixin(unit.inverseMultiplierMixin));
-            }
-            else static assert(0, "Timer not supported on this platform");
+            return DurationTicks(ticksPerSecond / mixin(unit.inverseMultiplierMixin));
         }
     }
 
@@ -221,6 +223,21 @@ template TimeTemplate(Policy)
                     throw new Exception(format("QueryPerformanceCounter failed (e=%d)", GetLastError()));
                 }
                 return TimestampTicks(ticksInteger.QuadPart);
+            }
+            else version (Posix)
+            {
+                import core.stdc.errno : errno;
+                import core.sys.posix.time : clock_gettime, timespec;
+                import core.sys.linux.time : CLOCK_MONOTONIC_RAW;
+                timespec now;
+                if (0 != clock_gettime(CLOCK_MONOTONIC_RAW, &now))
+                {
+                    import std.format : format;
+                    throw new Exception(format("clock_gettime with CLOCK_MONOTONIC_RAW failed (e=%d)", errno));
+                }
+                // TODO: detect overflow
+                return TimestampTicks((cast(TimestampInteger)now.tv_sec * ticksPerSecond) +
+                                      (now.tv_nsec * ticksPerSecond / 1000000000));
             }
         }
     }
@@ -264,11 +281,11 @@ template TimeTemplate(Policy)
         mixin OpCmpIntegral!("durationTicks", Yes.includeWrappedType);
         auto to(TimeUnit unit)() const
         {
-            return durationTicks * mixin(unit.inverseMultiplierMixin) / performanceFrequency;
+            return durationTicks * mixin(unit.inverseMultiplierMixin) / ticksPerSecond;
         }
         T to(TimeUnit unit, T)() const
         {
-            const result = durationTicks * mixin(unit.inverseMultiplierMixin) / performanceFrequency;
+            const result = durationTicks * mixin(unit.inverseMultiplierMixin) / ticksPerSecond;
             static if (T.sizeof < result.sizeof)
             {
                 if ((cast(typeof(result))T.max) < result)
