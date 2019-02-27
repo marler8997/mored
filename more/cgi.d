@@ -28,6 +28,11 @@ version (ToLogFile)
     private __gshared File logFile;
 }
 
+void log(T...)(T args)
+{
+    stderr.writeln(args);
+    stderr.flush();
+}
 void logf(T...)(const(char)[] fmt, T args)
 {
     version (ToLogFile)
