@@ -156,72 +156,193 @@ unittest
     }
 }
 
-/**
- On success, returns a pointer to the terminating null character in
- the dst buffer.
-
- If the src buffer contains an invalid '%XX' sequence, this function will
- stop decoding at that point copy the invalid sequence (along with a terminating
- null) to the dst buffer and return a pointer to the start of the invalid sequence.
-*/
-char* uriDecode(const(char)* src, char* dst)
+// TODO: use a function defined in a more common modules
+private bool contains(T)(const(T)[] haystack, const(T) needle)
 {
-    //log("uriDecode before \"%s\"", src[0..strlen(src)]);
-    //auto saveDst = dst;
-    //scope(exit) log("uriDecode after  \"%s\"", saveDst[0..strlen(saveDst)]);
-    for(;;dst++) {
-        char c = *src;
+    foreach (element; haystack)
+    {
+        if (element == needle)
+            return true;
+    }
+    return false;
+}
+
+// bad points to the '%' of the bad URI encoding
+void copyBadUriEncoding(char* dst, const(char)* bad, size_t max)
+{
+    for (size_t i = 0; ; i++)
+    {
+        if (i >= max)
+        {
+            dst[i] = '\0';
+            break;
+        }
+        dst[i] = bad[i];
+        if (!dst[i])
+            break;
+    }
+}
+
+/**
+On success, returns a pointer to the terminating null character in
+the dst buffer.
+
+If the src buffer contains an invalid '%XX' sequence, this function will
+stop decoding at that point copy the invalid sequence (along with a terminating
+null) to the dst buffer and return a pointer to the start of the invalid sequence.
+
+Note that dst and src can point to the same string.  The decoding is performed left-to-right
+so it still works.
+*/
+char* uriDecode(const(char)* src, char* dst, const(char)[] terminatingChars = "\0")
+{
+    for(;;dst++)
+    {
+        char c = src[0];
         src++;
         if(c == '+') {
-            *dst = ' ';
+            dst[0] = ' ';
         } else if (c == '%') {
-            char[2] hexChars = void;
-            hexChars[0] = *src;
+            c = src[0];
             src++;
-
-            ubyte hexNibble1 = hexValue(hexChars[0]);
-            if(hexNibble1 == ubyte.max) {
-              dst[0..2] = (src - 1)[0..2];
-              dst[2] = '\0';
-              return dst;
+            const hexNibble1 = hexValue(c);
+            if(hexNibble1 == ubyte.max)
+            {
+                copyBadUriEncoding(dst, src - 2, 2);
+                return dst;
             }
-
-            hexChars[1] = *src;
+            c = src[0];
             src++;
-
-            ubyte hexNibble2 = hexValue(hexChars[1]);
-            if(hexNibble2 == ubyte.max) {
-              dst[0..3] = (src - 2)[0..3];
-              dst[3] = '\0';
-              return dst;
+            const hexNibble2 = hexValue(c);
+            if(hexNibble2 == ubyte.max)
+            {
+                copyBadUriEncoding(dst, src - 3, 3);
+                return dst;
             }
-
-            *dst = cast(char)(hexNibble1 << 4 | hexNibble2);
-
-        } else if (c == '\0') {
-            *dst = '\0';
-            return dst;
+            dst[0] = cast(char)(hexNibble1 << 4 | hexNibble2);
+        } else if (terminatingChars.contains(c)) {
+            dst[0] = '\0';
+            return dst; // success
         } else {
-            *dst = c;
+            dst[0] = c;
         }
     }
 }
+
+char* uriDecode(const(char)[] src, char* dst)
+{
+    return uriDecode(src.ptr, src.ptr + src.length, dst);
+}
+char* uriDecode(const(char)* src, const(char)* srcLimit, char* dst)
+{
+    import core.stdc.string : memcpy;
+
+    for(;;dst++)
+    {
+        if (src >= srcLimit)
+        {
+            *dst = '\0';
+            return dst;
+        }
+        char c = src[0];
+        src++;
+        if(c == '+') {
+            dst[0] = ' ';
+        } else if (c == '%') {
+            if (src + 1 >= srcLimit)
+            {
+                 copyBadUriEncoding(dst, src - 1, 2);
+                 return dst; // fail
+            }
+            c = src[0];
+            src++;
+            const hexNibble1 = hexValue(c);
+            if(hexNibble1 == ubyte.max)
+            {
+                 copyBadUriEncoding(dst, src - 2, 2);
+                 return dst; // fail
+            }
+            c = src[0];
+            src++;
+            const hexNibble2 = hexValue(c);
+            if(hexNibble2 == ubyte.max)
+            {
+                 copyBadUriEncoding(dst, src - 3, 3);
+                 return dst; // fail
+            }
+            dst[0] = cast(char)(hexNibble1 << 4 | hexNibble2);
+        } else {
+            dst[0] = c;
+        }
+    }
+}
+
+/**
+Returns: null on error, the decoded string on success
+*/
+char[] tryUriDecodeInPlace(char* value, const(char)[] terminatingChars)
+{
+    auto result = uriDecode(value, value, terminatingChars);
+    if (result[0] == '\0')
+        return value[0 .. result - value];
+    return null; // error
+}
+
+/**
+Returns: a new null-terminated string or null on error
+*/
+char[] tryUriDecode(const(char)[] encoded)
+{
+    auto decoded = new char[encoded.length + 1];
+    auto result = uriDecode(encoded, decoded.ptr);
+    if (result[0] != '\0')
+        return null; // fail
+    return decoded[0 .. result - decoded.ptr];
+}
+
 unittest
 {
     import core.stdc.stdlib : alloca;
+    import core.stdc.string : strlen;
     mixin(scopedTest!("uri encode/decode"));
-    void test(const(char)[] before, const(char)[] expectedAfter)
+    static void test(const(char)[] before, const(char)[] expectedAfter)
     {
-        assert(before[$-1] == '\0');
-        auto actualAfter = cast(char*)alloca(before.length);
-        auto result = uriDecode(before.ptr, actualAfter);
-        assert(actualAfter[0 .. (result + 1) - actualAfter] == expectedAfter);
+        {
+            auto actualAfter = tryUriDecode(before);
+            assert(actualAfter == expectedAfter);
+        }
+        static char[] makeCopy(const(char)[] str, const(char)[] postfix)
+        {
+            auto copy = new char[str.length + postfix.length];
+            copy[0 .. str.length] = str[];
+            copy[str.length .. $] = postfix[];
+            return copy;
+        }
+
+        {
+            auto actualAfter = cast(char*)alloca(before.length + 1);
+            auto result = uriDecode(before.ptr, actualAfter);
+            assert(result[0] == '\0');
+            assert(actualAfter[0 .. result - actualAfter] == expectedAfter);
+        }
+        {
+            auto copy = makeCopy(before, "&");
+            auto actualAfter = cast(char*)alloca(before.length + 1);
+            auto result = uriDecode(copy.ptr, actualAfter, "&");
+            assert(result[0] == '\0');
+            assert(actualAfter[0 .. result - actualAfter] == expectedAfter);
+        }
+        {
+            auto copy = makeCopy(before, "\0");
+            auto afterCopy = tryUriDecodeInPlace(copy.ptr, "\0");
+            assert(afterCopy == expectedAfter);
+        }
     }
-    test("\0", "\0");
-    test("a\0", "a\0");
-    test("abcd\0", "abcd\0");
-    test("abcd+efgh\0", "abcd efgh\0");
-    test("a%00b%01c%02\0", "a\x00b\x01c\x02\0");
+    test("", "");
+    test("a", "a");
+    test("abcd", "abcd");
+    test("abcd+efgh", "abcd efgh");
+    test("a%00b%01c%02", "a\x00b\x01c\x02");
     for(ushort valueAsUShort = ubyte.min; valueAsUShort <= ubyte.max; valueAsUShort++) {
         auto value = cast(ubyte)valueAsUShort;
         char[2] expected;
@@ -234,11 +355,31 @@ unittest
         str[2] = toHexLower(cast(ubyte)(value & 0x0F));
         str[3] = '\0';
 
-        test(str, expected);
+        test(str[0 .. 3], expected[0 .. 1]);
 
         str[1] = toHexUpper(cast(ubyte)(value >> 4));
         str[2] = toHexUpper(cast(ubyte)(value & 0x0F));
 
-        test(str, expected);
+        test(str[0 .. 3], expected[0 .. 1]);
     }
+
+    static void testError(const(char)[] badEncoding, const(char)[] badPart)
+    {
+        assert(!tryUriDecode(badEncoding));
+        {
+            auto actualAfter = cast(char*)alloca(badEncoding.length + 1);
+            auto result =  uriDecode(badEncoding.ptr, actualAfter);
+            assert(result[0 .. strlen(result)] == badPart);
+        }
+        {
+            auto actualAfter = cast(char*)alloca(badEncoding.length + 1);
+            auto result =  uriDecode(badEncoding, actualAfter);
+            import std.stdio;writefln("badEncoding '%s' result '%s'", badEncoding, result[0 .. strlen(result)]);
+            assert(result[0 .. strlen(result)] == badPart);
+        }
+    }
+    testError("%", "%");
+    testError("foo%", "%");
+    testError("foo%a", "%a");
+    testError("foo%aZ", "%aZ");
 }

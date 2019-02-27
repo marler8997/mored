@@ -63,10 +63,6 @@ string inverseMultiplierMixin(TimeUnit unit) pure
 //       maybe something like more.typecons?
 //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-pragma(inline) T unconst(T)(const(T) thing)
-{
-    return cast(T)thing;
-}
 mixin template OpUnary(string wrappedFieldName)
 {
     mixin(`
@@ -327,6 +323,8 @@ template TimeTemplate(Policy)
     */
     struct LapTimerTicks
     {
+        import more.untype : unconst;
+
         private TimestampTicks startLapTime;
 
         /**
