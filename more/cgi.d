@@ -19,7 +19,7 @@ import std.stdio : File, stdout, stderr, stdin;
 import more.parse : hexValue, findCharPtr, skipCharSet;
 import more.format : formatEscapeByPolicy, formatEscapeSet, asciiFormatEscaped;
 public import more.format : formatHex;
-public import more.uri : uriDecode;
+public import more.uri : uriDecode, tryUriDecode;
 
 version = ToLogFile;
 version (ToLogFile)
@@ -671,8 +671,27 @@ template HttpTemplate(Hooks)
             foreach(var; queryVarsRange(buffer.ptr)) {
 
               foreach(varName; Hooks.FormVars) {
+                
                 if(__traits(getMember, formVars, varName) is null && var.name == varName) {
                   __traits(getMember, formVars, varName) = var.value;
+                  static if(hasMember!(Hooks, "DisableVarUriDecoding"))
+                      bool doDecode = !Hooks.DisableVarUriDecoding;
+                  else
+                      bool doDecode = true;
+                  if (doDecode)
+                  {
+                      auto result = tryUriDecode(__traits(getMember, formVars, varName));
+                      if (result is null)
+                      {
+                          // TODO: handle this error
+                          logf("WARNING: failed to decode post form data variable '%s' (TODO: detect and handle this error)", varName);
+                      }
+                      else
+                      {
+                          __traits(getMember, formVars, varName) = result;
+                      }
+                  }
+
                   formVarsLeft--;
                   if(formVarsLeft == 0 && urlOrFormVarsLeft == 0) {
                     break POST_CONTENT_VAR_LOOP;
@@ -681,8 +700,26 @@ template HttpTemplate(Hooks)
                 }
               }
               foreach(varName; Hooks.UrlOrFormVars) {
+
                 if(__traits(getMember, urlOrFormVars, varName) is null && var.name == varName) {
                   __traits(getMember, urlOrFormVars, varName) = var.value;
+                  static if(hasMember!(Hooks, "DisableVarUriDecoding"))
+                      bool doDecode = !Hooks.DisableVarUriDecoding;
+                  else
+                      bool doDecode = true;
+                  if (doDecode)
+                  {
+                      auto result = tryUriDecode(__traits(getMember, urlOrFormVars, varName));
+                      if (result is null)
+                      {
+                          // TODO: handle this error
+                          logf("WARNING: failed to decode post form data variable '%s' (TODO: detect and handle this error)", varName);
+                      }
+                      else
+                      {
+                          __traits(getMember, urlOrFormVars, varName) = result;
+                      }
+                  }
                   urlOrFormVarsLeft--;
                   if(formVarsLeft == 0 && urlOrFormVarsLeft == 0) {
                     break POST_CONTENT_VAR_LOOP;

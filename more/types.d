@@ -1,5 +1,19 @@
 module more.types;
 
+pragma(inline) T unconst(T)(const(T) thing)
+{
+    return cast(T)thing;
+}
+
+pragma(inline) T* unconstElements(T)(const(T)* thing)
+{
+    return cast(T*)thing;
+}
+pragma(inline) T[] unconstElements(T)(const(T)[] thing)
+{
+    return cast(T[])thing;
+}
+
 // Example:
 // ---
 // return boolstatus.pass;
