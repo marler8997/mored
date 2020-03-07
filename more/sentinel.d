@@ -173,6 +173,8 @@ private template SentinelTemplate(T, immutable T sentinelValue)
         alias asConst this; // facilitates implicit conversion to const type
         // alias array this; // NEED MULTIPLE ALIAS THIS!!!
 
+        /+
+        Commented out because CommonArrayMembers already has a constructor for this
         /**
         Coerce the given `array` to a `SentinelArray`. It checks and asserts
         if the given array does not contain the sentinel value at `array.ptr[array.length]`.
@@ -183,6 +185,7 @@ private template SentinelTemplate(T, immutable T sentinelValue)
         {
             this.array = array;
         }
+        +/
     }
     struct ImmutableArray
     {
@@ -193,6 +196,7 @@ private template SentinelTemplate(T, immutable T sentinelValue)
         alias asConst this; // facilitates implicit conversion to const type
         // alias array this; // NEED MULTIPLE ALIAS THIS!!!
 
+        /+
         /**
         Coerce the given `array` to a `SentinelArray`. It checks and asserts
         if the given array does not contain the sentinel value at `array.ptr[array.length]`.
@@ -203,6 +207,7 @@ private template SentinelTemplate(T, immutable T sentinelValue)
         {
             this.array = array;
         }
+        +/
     }
     struct ConstArray
     {

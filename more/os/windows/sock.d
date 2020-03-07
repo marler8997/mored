@@ -19,6 +19,11 @@ import more.net.sock :
 pragma (lib, "ws2_32.lib");
 pragma (lib, "wsock32.lib");
 
+//
+// import types defined in druntime
+//
+public import core.sys.windows.winsock2 : timeval;
+
 immutable __gshared typeof(&getnameinfo) getnameinfoPointer;
 immutable __gshared typeof(&getaddrinfo) getaddrinfoPointer;
 immutable __gshared typeof(&freeaddrinfo) freeaddrinfoPointer;
@@ -222,11 +227,7 @@ enum : cint
 
     FIONBIO = cast(int)(IOC_IN | ((uint.sizeof & IOCPARM_MASK) << 16) | (102 << 8) | 126),
 }
-struct timeval
-{
-    cint tv_sec;
-    cint tv_usec;
-}
+
 
 struct WSADATA
 {

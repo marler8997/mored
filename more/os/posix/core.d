@@ -39,7 +39,7 @@ struct FileHandle
     {
         return _value < 0;
     }
-    @property auto val() const { return _value; }
+    @property auto val() const { return cast(cint)_value; }
 }
 
 alias sysresult_t = cint;

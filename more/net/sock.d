@@ -240,6 +240,7 @@ version (Windows)
         }
 
         private size_t value;
+        @property auto val() const { return cast(size_t) value; }
         @property bool isInvalid() const
         {
             return value == invalidValue.value;
@@ -268,6 +269,7 @@ struct SockLengthResult
     /**
     NOTE: will return failed if return value is not positive
     */
+    @property cint val() const { return cast(cint)value; }
     @property bool failed() const { return value < 0; }
     @property cuint length() in { assert(!failed); } do
     {
@@ -277,13 +279,8 @@ struct SockLengthResult
 struct SendResult
 {
     private SockLengthResult result;
-    private cuint expected;
+    @property auto val() const { return result.val; }
     @property bool failed() const { return result.failed; }
-    /**
-    NOTE: will return failed if return value is not positive
-    */
-    @property bool sentAll() const { return result.value == expected; }
-    @property auto sent() const { return result.value; }
 }
 
 SocketHandle createsocket(AddressFamily family, SocketType type, Protocol protocol)
@@ -365,7 +362,7 @@ auto sendto(T,U)(SocketHandle sock, const(T)[] buffer, uint flags, const(U)* to)
     if(T.sizeof == 1 && is(U == inet_sockaddr) || is(U == sockaddr_in) /* add more types */ )
 {
     auto sent = platform_sock.sendto(sock, cast(const(ubyte)*)buffer.ptr, buffer.length, flags, cast(const(sockaddr)*)to, U.sizeof);
-    return SendResult(sent, buffer.length);
+    return SendResult(sent);
 }
 
 struct fd_set
