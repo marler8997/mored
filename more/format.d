@@ -11,7 +11,7 @@ enum Case
 /**
 An alias to the common sink delegate used for string formatting.
 */
-alias StringSink = scope void delegate(const(char)[]);
+alias StringSink = void delegate(const(char)[]);
 
 /**
 A delegate formatter allows a delegate to behave as format function.
